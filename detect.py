@@ -37,6 +37,7 @@ def run(opt):
     yolo_hide_labels = opt.yolo_hide_labels
     yolo_hide_conf = opt.yolo_hide_conf
     yolo_half = opt.yolo_half
+    yolo_save_crop = opt.yolo_save_crop
 
     webcam = source.isnumeric() or source.endswith(".txt") or source.lower().startswith(
         ("rtsp://", "rtmp://", "http://", "https://")
@@ -75,7 +76,76 @@ def run(opt):
     # Run inference
     if device.type != "cpu":
         yolo_model(torch.zeros(1, 3, *yolo_imgsz).to(device).type_as(next(yolo_model.parameters())))
+    t0 = time.time()
+    for path, img, im0s, vid_cap in dataset:
+        img = torch.from_numpy(img).to(device)
+        img = img.half() if yolo_half else img.float()
+        img = img / 255.0
+        if len(img.shape) == 3:
+            img = img[None]
 
+        # Inference
+        t1 = time_sync()
+        pred = yolo_model(img)[0]
+
+        # NMS
+        pred = non_max_suppression(pred, yolo_conf_thr, yolo_iou_thr, yolo_target_classes, max_det=yolo_max_det)
+        t2 = time_sync()
+
+        # Process predictions
+        for i, det in enumerate(pred):
+            if webcam:
+                p, s, im0, frame = path[i], f"{i}: ", im0s[i].copy(), dataset.count
+            else:
+                p, s, im0, frame = path, "", im0s.copy(), getattr(dataset, "frame", 0)
+
+            p = Path(p)
+            save_path = str(save_dir / p.name)
+            s += "%gx%g " % img.shape[2:]
+            gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]
+            imc = im0.copy() if yolo_save_crop else im0
+            annotator = Annotator(im0, line_width=2, pil=not ascii)
+            if len(det):
+                # Rescale boxes from img_size to im0 size
+                det[:, :4] = scale_coords(img.shape[2:], det[:, :4], im0.shape).round()
+
+                # Print results
+                for c in det[:, -1].unique():
+                    n = (det[:, -1] == c).sum()
+                    s += f"{n} {names[int(c)]}{'s' * (n > 1)}, "
+
+                # Write results
+                for *xyxy, conf, cls in reversed(det):
+                    c = int(cls)
+                    label = None if yolo_hide_labels else (names[c] if yolo_hide_conf else f"{names[c]} {conf:.2f}")
+                    annotator.box_label(xyxy, label, color=colors(c, True))
+                    if yolo_save_crop:
+                        save_one_box(xyxy, imc, file=save_dir / "crops" / names[c] / f"{p.stem}.jpg", BGR=True)
+
+            # Print time (inference + NMS)
+            print(f"{s}Done. ({t2 - t1:.3f}s")
+
+            # Stream results
+            im0 = annotator.result()
+            cv2.imshow(str(p), im0)
+            cv2.waitKey(1)
+
+            if dataset.mode == "image":
+                cv2.imwrite(save_path, im0)
+            else:
+                if vid_path[i] != save_path:
+                    vid_path[i] = save_path
+                    if isinstance(vid_writer[i], cv2.VideoWriter):
+                        vid_writer[i].release()
+                    if vid_cap:
+                        fps = vid_cap.get(cv2.CAP_PROP_FPS)
+                        w = int(vid_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+                        h = int(vid_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                    else:
+                        fps, w, h = 30, im0.shape[1], im0.shape[0]
+                        save_path += ".mp4"
+                vid_writer[i] = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*"mp4v"), fps, (w, h))
+            vid_writer[i].write(im0)
 
 def parse_opt():
     parser = argparse.ArgumentParser()
@@ -91,6 +161,7 @@ def parse_opt():
     parser.add_argument("--yolo-hide-labels", default=False, action="store_true")
     parser.add_argument("--yolo-hide-conf", default=False, action="store_true")
     parser.add_argument("--yolo-half", default=False, action="store_true")
+    parser.add_argument("--yolo-save-crop", default=True, action="store_true")
 
     source = "rtsp://datonai:datonai@172.30.1.49:554/stream1"
     parser.add_argument("--source", type=str, default=source)
