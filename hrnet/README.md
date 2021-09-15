@@ -1,78 +1,86 @@
-# [HigherHRNet: Scale-Aware Representation Learning for Bottom-Up Human Pose Estimation (CVPR 2020)](https://arxiv.org/abs/1908.10357)
-
+# Deep High-Resolution Representation Learning for Human Pose Estimation (CVPR 2019)
 ## News
-* \[2021/04/12\] Welcome to check out our recent work on bottom-up pose estimation (CVPR 2021) [HRNet-DEKR](https://github.com/HRNet/DEKR)!
-* \[2020/07/05\] [A very nice blog](https://towardsdatascience.com/overview-of-human-pose-estimation-neural-networks-hrnet-higherhrnet-architectures-and-faq-1954b2f8b249) from Towards Data Science introducing HRNet and HigherHRNet for human pose estimation.
-* \[2020/03/12\] Support train/test on the CrowdPose dataset.
-* \[2020/02/24\] HigherHRNet is accepted to CVPR2020!
-* \[2019/11/23\] Code and models for [HigherHRNet](https://arxiv.org/abs/1908.10357) are now released!
-* \[2019/08/27\] HigherHRNet is now on [ArXiv](https://arxiv.org/abs/1908.10357). We will also release code and models, stay tuned!
+- [2021/04/12] Welcome to check out our recent work on bottom-up pose estimation (CVPR 2021) [HRNet-DEKR](https://github.com/HRNet/DEKR)!
+- [2020/07/05] [A very nice blog](https://towardsdatascience.com/overview-of-human-pose-estimation-neural-networks-hrnet-higherhrnet-architectures-and-faq-1954b2f8b249) from Towards Data Science introducing HRNet and HigherHRNet for human pose estimation.
+- [2020/03/13] A longer version is accepted by TPAMI: [Deep High-Resolution Representation Learning for Visual Recognition](https://arxiv.org/pdf/1908.07919.pdf). It includes more HRNet applications, and the codes are available: [semantic segmentation](https://github.com/HRNet/HRNet-Semantic-Segmentation),  [objection detection](https://github.com/HRNet/HRNet-Object-Detection),  [facial landmark detection](https://github.com/HRNet/HRNet-Facial-Landmark-Detection), and [image classification](https://github.com/HRNet/HRNet-Image-Classification).
+- [2020/02/01] We have added demo code for HRNet. Thanks [Alex Simes](https://github.com/alex9311). 
+- Visualization code for showing the pose estimation results. Thanks Depu!
+- [2019/08/27] HigherHRNet is now on [ArXiv](https://arxiv.org/abs/1908.10357), which is a bottom-up approach for human pose estimation powerd by HRNet. We will also release code and models at [Higher-HRNet-Human-Pose-Estimation](https://github.com/HRNet/Higher-HRNet-Human-Pose-Estimation), stay tuned!
+- Our new work [High-Resolution Representations for Labeling Pixels and Regions](https://arxiv.org/abs/1904.04514) is available at [HRNet](https://github.com/HRNet). Our HRNet has been applied to a wide range of vision tasks, such as [image classification](https://github.com/HRNet/HRNet-Image-Classification), [objection detection](https://github.com/HRNet/HRNet-Object-Detection), [semantic segmentation](https://github.com/HRNet/HRNet-Semantic-Segmentation) and [facial landmark](https://github.com/HRNet/HRNet-Facial-Landmark-Detection).
 
 ## Introduction
-This is the official code of [HigherHRNet: Scale-Aware Representation Learning for Bottom-Up Human Pose Estimation](https://arxiv.org/abs/1908.10357).  
-Bottom-up human pose estimation methods have difficulties in predicting the correct pose for small persons due to challenges in scale variation. In this paper, we present **HigherHRNet**: a novel bottom-up human pose estimation method for learning scale-aware representations using high-resolution feature pyramids. Equipped with multi-resolution supervision for training and multi-resolution aggregation  for inference, the proposed approach is able to solve the scale variation challenge in *bottom-up multi-person* pose estimation and localize keypoints more precisely, especially for small person. The feature pyramid in HigherHRNet consists of feature map outputs from HRNet and upsampled higher-resolution outputs through a transposed convolution. HigherHRNet outperforms the previous best bottom-up method by 2.5% AP for medium person on COCO test-dev, showing its effectiveness in handling scale variation. Furthermore, HigherHRNet achieves new state-of-the-art result on COCO test-dev (70.5% AP) without using refinement or other post-processing techniques, surpassing all existing bottom-up methods. HigherHRNet even surpasses all top-down methods on CrowdPose test (67.6% AP), suggesting its robustness in crowded scene. 
+This is an official pytorch implementation of [*Deep High-Resolution Representation Learning for Human Pose Estimation*](https://arxiv.org/abs/1902.09212). 
+In this work, we are interested in the human pose estimation problem with a focus on learning reliable high-resolution representations. Most existing methods **recover high-resolution representations from low-resolution representations** produced by a high-to-low resolution network. Instead, our proposed network **maintains high-resolution representations** through the whole process.
+We start from a high-resolution subnetwork as the first stage, gradually add high-to-low resolution subnetworks one by one to form more stages, and connect the mutli-resolution subnetworks **in parallel**. We conduct **repeated multi-scale fusions** such that each of the high-to-low resolution representations receives information from other parallel representations over and over, leading to rich high-resolution representations. As a result, the predicted keypoint heatmap is potentially more accurate and spatially more precise. We empirically demonstrate the effectiveness of our network through the superior pose estimation results over two benchmark datasets: the COCO keypoint detection dataset and the MPII Human Pose dataset. </br>
 
-![Illustrating the architecture of the proposed Higher-HRNet](/figures/arch_v2.png)
-
+![Illustrating the architecture of the proposed HRNet](/figures/hrnet.png)
 ## Main Results
-### Results on COCO val2017 without multi-scale test
-| Method             | Backbone | Input size | #Params | GFLOPs |    AP | Ap .5 | AP .75 | AP (M) | AP (L) |
-|--------------------|----------|------------|---------|--------|-------|-------|--------|--------|--------| 
-| HigherHRNet        | HRNet-w32  | 512      |  28.6M  | 47.9   | 67.1  | 86.2  |  73.0  |  61.5  |  76.1  | 
-| HigherHRNet        | HRNet-w32  | 640      |  28.6M  | 74.8   | 68.5  | 87.1  |  74.7  |  64.3  |  75.3  | 
-| HigherHRNet        | HRNet-w48  | 640      |  63.8M  | 154.3  | 69.9  | 87.2  |  76.1  |  65.4  |  76.4  | 
+### Results on MPII val
+| Arch               | Head | Shoulder | Elbow | Wrist |  Hip | Knee | Ankle | Mean | Mean@0.1 |
+|--------------------|------|----------|-------|-------|------|------|-------|------|----------|
+| pose_resnet_50     | 96.4 |     95.3 |  89.0 |  83.2 | 88.4 | 84.0 |  79.6 | 88.5 |     34.0 |
+| pose_resnet_101    | 96.9 |     95.9 |  89.5 |  84.4 | 88.4 | 84.5 |  80.7 | 89.1 |     34.0 |
+| pose_resnet_152    | 97.0 |     95.9 |  90.0 |  85.0 | 89.2 | 85.3 |  81.3 | 89.6 |     35.0 |
+| **pose_hrnet_w32** | 97.1 |     95.9 |  90.3 |  86.4 | 89.1 | 87.1 |  83.3 | 90.3 |     37.7 |
 
-### Results on COCO val2017 *with* multi-scale test
-| Method             | Backbone | Input size | #Params | GFLOPs |    AP | Ap .5 | AP .75 | AP (M) | AP (L) |
-|--------------------|----------|------------|---------|--------|-------|-------|--------|--------|--------| 
-| HigherHRNet        | HRNet-w32  | 512      |  28.6M  | 47.9   | 69.9  | 87.1  |  76.0  |  65.3  |  77.0  | 
-| HigherHRNet        | HRNet-w32  | 640      |  28.6M  | 74.8   | 70.6  | 88.1  |  76.9  |  66.6  |  76.5  | 
-| HigherHRNet        | HRNet-w48  | 640      |  63.8M  | 154.3  | 72.1  | 88.4  |  78.2  |  67.8  |  78.3  | 
+### Note:
+- Flip test is used.
+- Input size is 256x256
+- pose_resnet_[50,101,152] is our previous work of [*Simple Baselines for Human Pose Estimation and Tracking*](http://openaccess.thecvf.com/content_ECCV_2018/html/Bin_Xiao_Simple_Baselines_for_ECCV_2018_paper.html)
 
-### Results on COCO test-dev2017 without multi-scale test
-| Method             | Backbone | Input size | #Params | GFLOPs |    AP | Ap .5 | AP .75 | AP (M) | AP (L) |
-|--------------------|----------|------------|---------|--------|-------|-------|--------|--------|--------|
-| OpenPose\*         |    -     | -          |   -     |  -     | 61.8  | 84.9  |  67.5  |  57.1  |  68.2  | 
-| Hourglass          | Hourglass  | 512      | 277.8M  | 206.9  | 56.6  | 81.8  |  61.8  |  49.8  |  67.0  | 
-| PersonLab          | ResNet-152  | 1401    |  68.7M  | 405.5  | 66.5  | 88.0  |  72.6  |  62.4  |  72.3  |
-| PifPaf             |    -     | -          |   -     |  -     | 66.7  | -     |  -     |  62.4  |  72.9  | 
-| Bottom-up HRNet    | HRNet-w32  | 512      |  28.5M  | 38.9   | 64.1  | 86.3  |  70.4  |  57.4  |  73.9  | 
-| **HigherHRNet**    | HRNet-w32  | 512      |  28.6M  | 47.9   | 66.4  | 87.5  |  72.8  |  61.2  |  74.2  | 
-| **HigherHRNet**    | HRNet-w48  | 640      |  63.8M  | 154.3  | **68.4**  | **88.2**  |  **75.1**  |  **64.4**  |  **74.2**  | 
+### Results on COCO val2017 with detector having human AP of 56.4 on COCO val2017 dataset
+| Arch               | Input size | #Params | GFLOPs |    AP | Ap .5 | AP .75 | AP (M) | AP (L) |    AR | AR .5 | AR .75 | AR (M) | AR (L) |
+|--------------------|------------|---------|--------|-------|-------|--------|--------|--------|-------|-------|--------|--------|--------|
+| pose_resnet_50     |    256x192 | 34.0M   |    8.9 | 0.704 | 0.886 |  0.783 |  0.671 |  0.772 | 0.763 | 0.929 |  0.834 |  0.721 |  0.824 |
+| pose_resnet_50     |    384x288 | 34.0M   |   20.0 | 0.722 | 0.893 |  0.789 |  0.681 |  0.797 | 0.776 | 0.932 |  0.838 |  0.728 |  0.846 |
+| pose_resnet_101    |    256x192 | 53.0M   |   12.4 | 0.714 | 0.893 |  0.793 |  0.681 |  0.781 | 0.771 | 0.934 |  0.840 |  0.730 |  0.832 |
+| pose_resnet_101    |    384x288 | 53.0M   |   27.9 | 0.736 | 0.896 |  0.803 |  0.699 |  0.811 | 0.791 | 0.936 |  0.851 |  0.745 |  0.858 |
+| pose_resnet_152    |    256x192 | 68.6M   |   15.7 | 0.720 | 0.893 |  0.798 |  0.687 |  0.789 | 0.778 | 0.934 |  0.846 |  0.736 |  0.839 |
+| pose_resnet_152    |    384x288 | 68.6M   |   35.3 | 0.743 | 0.896 |  0.811 |  0.705 |  0.816 | 0.797 | 0.937 |  0.858 |  0.751 |  0.863 |
+| **pose_hrnet_w32** |    256x192 | 28.5M   |    7.1 | 0.744 | 0.905 |  0.819 |  0.708 |  0.810 | 0.798 | 0.942 |  0.865 |  0.757 |  0.858 |
+| **pose_hrnet_w32** |    384x288 | 28.5M   |   16.0 | 0.758 | 0.906 |  0.825 |  0.720 |  0.827 | 0.809 | 0.943 |  0.869 |  0.767 |  0.871 |
+| **pose_hrnet_w48** |    256x192 | 63.6M   |   14.6 | 0.751 | 0.906 |  0.822 |  0.715 |  0.818 | 0.804 | 0.943 |  0.867 |  0.762 |  0.864 |
+| **pose_hrnet_w48** |    384x288 | 63.6M   |   32.9 | 0.763 | 0.908 |  0.829 |  0.723 |  0.834 | 0.812 | 0.942 |  0.871 |  0.767 |  0.876 |
 
-### Results on COCO test-dev2017 *with* multi-scale test
-| Method             | Backbone | Input size | #Params | GFLOPs |    AP | Ap .5 | AP .75 | AP (M) | AP (L) |
-|--------------------|----------|------------|---------|--------|-------|-------|--------|--------|--------|
-| Hourglass          | Hourglass  | 512      | 277.8M  | 206.9  | 63.0  | 85.7  |  68.9  |  58.0  |  70.4  | 
-| Hourglass\*        | Hourglass  | 512      | 277.8M  | 206.9  | 65.5  | 86.8  |  72.3  |  60.6  |  72.6  | 
-| PersonLab          | ResNet-152  | 1401    |  68.7M  | 405.5  | 68.7  | 89.0  |  75.4  |  64.1  |  75.5  | 
-| **HigherHRNet**    | HRNet-w48  | 640      |  63.8M  | 154.3  | **70.5**  | **89.3**  |  **77.2**  |  **66.6**  |  **75.8**  | 
+### Note:
+- Flip test is used.
+- Person detector has person AP of 56.4 on COCO val2017 dataset.
+- pose_resnet_[50,101,152] is our previous work of [*Simple Baselines for Human Pose Estimation and Tracking*](http://openaccess.thecvf.com/content_ECCV_2018/html/Bin_Xiao_Simple_Baselines_for_ECCV_2018_paper.html).
+- GFLOPs is for convolution and linear layers only.
 
-### Results on CrowdPose test
-| Method             |    AP | Ap .5 | AP .75 | AP (E) | AP (M) | AP (H) |
-|--------------------|-------|-------|--------|--------|--------|--------|
-| Mask-RCNN          | 57.2  | 83.5  | 60.3   | 69.4   | 57.9   | 45.8   |
-| AlphaPose          | 61.0  | 81.3  | 66.0   | 71.2   | 61.4   | 51.1   |
-| SPPE               | 66.0. | 84.2 | 71.5 | 75.5 | 66.3 | 57.4 |
-| OpenPose           | - | - | - | 62.7 | 48.7 | 32.3 |
-| **HigherHRNet**    | 65.9 | 86.4 | 70.6 | 73.3 | 66.5 | 57.9 |
-| **HigherHRNet+**   | **67.6** | **87.4** | **72.6** | **75.8** | **68.1** | **58.9** |
 
-*Note: + indicates using multi-scale test.*
+### Results on COCO test-dev2017 with detector having human AP of 60.9 on COCO test-dev2017 dataset
+| Arch               | Input size | #Params | GFLOPs |    AP | Ap .5 | AP .75 | AP (M) | AP (L) |    AR | AR .5 | AR .75 | AR (M) | AR (L) |
+|--------------------|------------|---------|--------|-------|-------|--------|--------|--------|-------|-------|--------|--------|--------|
+| pose_resnet_152    |    384x288 | 68.6M   |   35.3 | 0.737 | 0.919 |  0.828 |  0.713 |  0.800 | 0.790 | 0.952 |  0.856 |  0.748 |  0.849 |
+| **pose_hrnet_w48** |    384x288 | 63.6M   |   32.9 | 0.755 | 0.925 |  0.833 |  0.719 |  0.815 | 0.805 | 0.957 |  0.874 |  0.763 |  0.863 |
+| **pose_hrnet_w48\*** |    384x288 | 63.6M   |   32.9 | 0.770 | 0.927 |  0.845 |  0.734 |  0.831 | 0.820 | 0.960 |  0.886 |  0.778 |  0.877 |
+
+### Note:
+- Flip test is used.
+- Person detector has person AP of 60.9 on COCO test-dev2017 dataset.
+- pose_resnet_152 is our previous work of [*Simple Baselines for Human Pose Estimation and Tracking*](http://openaccess.thecvf.com/content_ECCV_2018/html/Bin_Xiao_Simple_Baselines_for_ECCV_2018_paper.html).
+- GFLOPs is for convolution and linear layers only.
+- pose_hrnet_w48\* means using additional data from [AI challenger](https://challenger.ai/dataset/keypoint) for training.
 
 ## Environment
 The code is developed using python 3.6 on Ubuntu 16.04. NVIDIA GPUs are needed. The code is developed and tested using 4 NVIDIA P100 GPU cards. Other platforms or GPU cards are not fully tested.
 
 ## Quick start
 ### Installation
-1. Install pytorch >= v1.1.0 following [official instruction](https://pytorch.org/).  
-   - **Tested with pytorch v1.4.0**
+1. Install pytorch >= v1.0.0 following [official instruction](https://pytorch.org/).
+   **Note that if you use pytorch's version < v1.0.0, you should following the instruction at <https://github.com/Microsoft/human-pose-estimation.pytorch> to disable cudnn's implementations of BatchNorm layer. We encourage you to use higher pytorch's version(>=v1.0.0)**
 2. Clone this repo, and we'll call the directory that you cloned as ${POSE_ROOT}.
 3. Install dependencies:
    ```
    pip install -r requirements.txt
    ```
-4. Install [COCOAPI](https://github.com/cocodataset/cocoapi):
+4. Make libs:
+   ```
+   cd ${POSE_ROOT}/lib
+   make
+   ```
+5. Install [COCOAPI](https://github.com/cocodataset/cocoapi):
    ```
    # COCOAPI=/path/to/clone/cocoapi
    git clone https://github.com/cocodataset/cocoapi.git $COCOAPI
@@ -84,9 +92,7 @@ The code is developed using python 3.6 on Ubuntu 16.04. NVIDIA GPUs are needed. 
    python3 setup.py install --user
    ```
    Note that instructions like # COCOAPI=/path/to/install/cocoapi indicate that you should pick a path where you'd like to have the software cloned and then set an environment variable (COCOAPI in this case) accordingly.
-5. Install [CrowdPoseAPI](https://github.com/Jeff-sjtu/CrowdPose) exactly the same as COCOAPI.  
-   - **There is a bug in the CrowdPoseAPI, please reverse https://github.com/Jeff-sjtu/CrowdPose/commit/785e70d269a554b2ba29daf137354103221f479e**
-6. Init output(training model output directory) and log(tensorboard log directory) directory:
+4. Init output(training model output directory) and log(tensorboard log directory) directory:
 
    ```
    mkdir output 
@@ -108,21 +114,56 @@ The code is developed using python 3.6 on Ubuntu 16.04. NVIDIA GPUs are needed. 
    └── requirements.txt
    ```
 
-7. Download pretrained models from our model zoo([GoogleDrive](https://drive.google.com/open?id=1bdXVmYrSynPLSk5lptvgyQ8fhziobD50) or [OneDrive](https://1drv.ms/f/s!AhIXJn_J-blW4AwKRMklXVzndJT0))
+6. Download pretrained models from our model zoo([GoogleDrive](https://drive.google.com/drive/folders/1hOTihvbyIxsm5ygDpbUuJ7O_tzv4oXjC?usp=sharing) or [OneDrive](https://1drv.ms/f/s!AhIXJn_J-blW231MH2krnmLq5kkQ))
    ```
    ${POSE_ROOT}
     `-- models
         `-- pytorch
             |-- imagenet
-            |   `-- hrnet_w32-36af842e.pth
-            `-- pose_coco
-                `-- pose_higher_hrnet_w32_512.pth
+            |   |-- hrnet_w32-36af842e.pth
+            |   |-- hrnet_w48-8ef0771d.pth
+            |   |-- resnet50-19c8e357.pth
+            |   |-- resnet101-5d3b4d8f.pth
+            |   `-- resnet152-b121ed2d.pth
+            |-- pose_coco
+            |   |-- pose_hrnet_w32_256x192.pth
+            |   |-- pose_hrnet_w32_384x288.pth
+            |   |-- pose_hrnet_w48_256x192.pth
+            |   |-- pose_hrnet_w48_384x288.pth
+            |   |-- pose_resnet_101_256x192.pth
+            |   |-- pose_resnet_101_384x288.pth
+            |   |-- pose_resnet_152_256x192.pth
+            |   |-- pose_resnet_152_384x288.pth
+            |   |-- pose_resnet_50_256x192.pth
+            |   `-- pose_resnet_50_384x288.pth
+            `-- pose_mpii
+                |-- pose_hrnet_w32_256x256.pth
+                |-- pose_hrnet_w48_256x256.pth
+                |-- pose_resnet_101_256x256.pth
+                |-- pose_resnet_152_256x256.pth
+                `-- pose_resnet_50_256x256.pth
 
    ```
    
 ### Data preparation
+**For MPII data**, please download from [MPII Human Pose Dataset](http://human-pose.mpi-inf.mpg.de/). The original annotation files are in matlab format. We have converted them into json format, you also need to download them from [OneDrive](https://1drv.ms/f/s!AhIXJn_J-blW00SqrairNetmeVu4) or [GoogleDrive](https://drive.google.com/drive/folders/1En_VqmStnsXMdldXA6qpqEyDQulnmS3a?usp=sharing).
+Extract them under {POSE_ROOT}/data, and make them look like this:
+```
+${POSE_ROOT}
+|-- data
+`-- |-- mpii
+    `-- |-- annot
+        |   |-- gt_valid.mat
+        |   |-- test.json
+        |   |-- train.json
+        |   |-- trainval.json
+        |   `-- valid.json
+        `-- images
+            |-- 000001163.jpg
+            |-- 000003072.jpg
+```
 
-**For COCO data**, please download from [COCO download](http://cocodataset.org/#download), 2017 Train/Val is needed for COCO keypoints training and validation.
+**For COCO data**, please download from [COCO download](http://cocodataset.org/#download), 2017 Train/Val is needed for COCO keypoints training and validation. We also provide person detection result of COCO val2017 and test-dev2017 to reproduce our multi-person pose estimation results. Please download from [OneDrive](https://1drv.ms/f/s!AhIXJn_J-blWzzDXoz5BeFl8sWM-) or [GoogleDrive](https://drive.google.com/drive/folders/1fRUDNUDxe9fjqcRZ2bnF_TKMlO0nB_dk?usp=sharing).
 Download and extract them under {POSE_ROOT}/data, and make them look like this:
 ```
 ${POSE_ROOT}
@@ -131,6 +172,9 @@ ${POSE_ROOT}
     `-- |-- annotations
         |   |-- person_keypoints_train2017.json
         |   `-- person_keypoints_val2017.json
+        |-- person_detection_results
+        |   |-- COCO_val2017_detections_AP_H_56_person.json
+        |   |-- COCO_test-dev2017_detections_AP_H_609_person.json
         `-- images
             |-- train2017
             |   |-- 000000000009.jpg
@@ -144,129 +188,87 @@ ${POSE_ROOT}
                 |-- ... 
 ```
 
-**For CrowdPose data**, please download from [CrowdPose download](https://github.com/Jeff-sjtu/CrowdPose#dataset), Train/Val is needed for CrowdPose keypoints training and validation.
-Download and extract them under {POSE_ROOT}/data, and make them look like this:
-```
-${POSE_ROOT}
-|-- data
-`-- |-- crowd_pose
-    `-- |-- json
-        |   |-- crowdpose_train.json
-        |   |-- crowdpose_val.json
-        |   |-- crowdpose_trainval.json (generated by tools/crowdpose_concat_train_val.py)
-        |   `-- crowdpose_test.json
-        `-- images
-            |-- 100000.jpg
-            |-- 100001.jpg
-            |-- 100002.jpg
-            |-- 100003.jpg
-            |-- 100004.jpg
-            |-- 100005.jpg
-            |-- ... 
-```
-After downloading data, run `python tools/crowdpose_concat_train_val.py` under `${POSE_ROOT}` to create trainval set.
-
 ### Training and Testing
 
-#### Testing on COCO val2017 dataset using model zoo's models ([GoogleDrive](https://drive.google.com/drive/folders/1X9-TzWpwbX2zQf2To8lB-ZQHMYviYYh6?usp=sharing))
+#### Testing on MPII dataset using model zoo's models([GoogleDrive](https://drive.google.com/drive/folders/1hOTihvbyIxsm5ygDpbUuJ7O_tzv4oXjC?usp=sharing) or [OneDrive](https://1drv.ms/f/s!AhIXJn_J-blW231MH2krnmLq5kkQ))
  
 
-For single-scale testing:
-
 ```
-python tools/valid.py \
-    --cfg experiments/coco/higher_hrnet/w32_512_adam_lr1e-3.yaml \
-    TEST.MODEL_FILE models/pytorch/pose_coco/pose_higher_hrnet_w32_512.pth
+python tools/test.py \
+    --cfg experiments/mpii/hrnet/w32_256x256_adam_lr1e-3.yaml \
+    TEST.MODEL_FILE models/pytorch/pose_mpii/pose_hrnet_w32_256x256.pth
 ```
 
-By default, we use horizontal flip. To test without flip:
+#### Training on MPII dataset
 
 ```
-python tools/valid.py \
-    --cfg experiments/coco/higher_hrnet/w32_512_adam_lr1e-3.yaml \
-    TEST.MODEL_FILE models/pytorch/pose_coco/pose_higher_hrnet_w32_512.pth \
-    TEST.FLIP_TEST False
+python tools/train.py \
+    --cfg experiments/mpii/hrnet/w32_256x256_adam_lr1e-3.yaml
 ```
 
-Multi-scale testing is also supported, although we do not report results in our paper:
+#### Testing on COCO val2017 dataset using model zoo's models([GoogleDrive](https://drive.google.com/drive/folders/1hOTihvbyIxsm5ygDpbUuJ7O_tzv4oXjC?usp=sharing) or [OneDrive](https://1drv.ms/f/s!AhIXJn_J-blW231MH2krnmLq5kkQ))
+ 
 
 ```
-python tools/valid.py \
-    --cfg experiments/coco/higher_hrnet/w32_512_adam_lr1e-3.yaml \
-    TEST.MODEL_FILE models/pytorch/pose_coco/pose_higher_hrnet_w32_512.pth \
-    TEST.SCALE_FACTOR '[0.5, 1.0, 2.0]'
+python tools/test.py \
+    --cfg experiments/coco/hrnet/w32_256x192_adam_lr1e-3.yaml \
+    TEST.MODEL_FILE models/pytorch/pose_coco/pose_hrnet_w32_256x192.pth \
+    TEST.USE_GT_BBOX False
 ```
-
 
 #### Training on COCO train2017 dataset
 
 ```
-python tools/dist_train.py \
-    --cfg experiments/coco/higher_hrnet/w32_512_adam_lr1e-3.yaml 
+python tools/train.py \
+    --cfg experiments/coco/hrnet/w32_256x192_adam_lr1e-3.yaml \
 ```
 
-By default, it will use all available GPUs on the machine for training. To specify GPUs, use
+### Visualization
+
+#### Visualizing predictions on COCO val
 
 ```
-CUDA_VISIBLE_DEVICES=0,1 python tools/dist_train.py \
-    --cfg experiments/coco/higher_hrnet/w32_512_adam_lr1e-3.yaml 
-```
-
-#### Mixed-precision training
-Due to large input size for bottom-up methods, we use mixed-precision training to train our Higher-HRNet by using the following command:
-```
-python tools/dist_train.py \
-    --cfg experiments/coco/higher_hrnet/w32_512_adam_lr1e-3.yaml \
-    FP16.ENABLED True FP16.DYNAMIC_LOSS_SCALE True
-```
-
-#### Synchronized BatchNorm training
-If you have limited GPU memory, please try to reduce batch size and use SyncBN to train our Higher-HRNet by using the following command:
-```
-python tools/dist_train.py \
-    --cfg experiments/coco/higher_hrnet/w32_512_adam_lr1e-3.yaml \
-    FP16.ENABLED True FP16.DYNAMIC_LOSS_SCALE True \
-    MODEL.SYNC_BN True
-```
-
-Our code for mixed-precision training is borrowed from [NVIDIA Apex API](https://github.com/NVIDIA/apex).
-
-#### Training on CrowdPose trainval dataset
+python visualization/plot_coco.py \
+    --prediction output/coco/w48_384x288_adam_lr1e-3/results/keypoints_val2017_results_0.json \
+    --save-path visualization/results
 
 ```
-python tools/dist_train.py \
-    --cfg experiments/crowd_pose/higher_hrnet/w32_512_adam_lr1e-3.yaml 
-```
 
+
+<img src="figures\visualization\coco\score_610_id_2685_000000002685.png" height="215"><img src="figures\visualization\coco\score_710_id_153229_000000153229.png" height="215"><img src="figures\visualization\coco\score_755_id_343561_000000343561.png" height="215">
+
+<img src="figures\visualization\coco\score_755_id_559842_000000559842.png" height="209"><img src="figures\visualization\coco\score_770_id_6954_000000006954.png" height="209"><img src="figures\visualization\coco\score_919_id_53626_000000053626.png" height="209">
 
 ### Other applications
-Many other dense prediction tasks, such as segmentation, face alignment and object detection, etc. have been benefited by HRNet. More information can be found at [Deep High-Resolution Representation Learning](https://jingdongwang2017.github.io/Projects/HRNet/).
+Many other dense prediction tasks, such as segmentation, face alignment and object detection, etc. have been benefited by HRNet. More information can be found at [High-Resolution Networks](https://github.com/HRNet).
 
-### Other implementations
+### Other implementation
 [mmpose](https://github.com/open-mmlab/mmpose)
 
-## Citation
-If you find this work or code is helpful in your research, please cite:
-````
-@inproceedings{cheng2020bottom,
-  title={HigherHRNet: Scale-Aware Representation Learning for Bottom-Up Human Pose Estimation},
-  author={Bowen Cheng and Bin Xiao and Jingdong Wang and Honghui Shi and Thomas S. Huang and Lei Zhang},
-  booktitle={CVPR},
-  year={2020}
-}
 
-@inproceedings{SunXLW19,
+### Citation
+If you use our code or models in your research, please cite with:
+```
+@inproceedings{sun2019deep,
   title={Deep High-Resolution Representation Learning for Human Pose Estimation},
-  author={Ke Sun and Bin Xiao and Dong Liu and Jingdong Wang},
+  author={Sun, Ke and Xiao, Bin and Liu, Dong and Wang, Jingdong},
   booktitle={CVPR},
   year={2019}
 }
 
-@article{wang2019deep,
+@inproceedings{xiao2018simple,
+    author={Xiao, Bin and Wu, Haiping and Wei, Yichen},
+    title={Simple Baselines for Human Pose Estimation and Tracking},
+    booktitle = {European Conference on Computer Vision (ECCV)},
+    year = {2018}
+}
+
+@article{WangSCJDZLMTWLX19,
   title={Deep High-Resolution Representation Learning for Visual Recognition},
-  author={Wang, Jingdong and Sun, Ke and Cheng, Tianheng and Jiang, Borui and Deng, Chaorui and Zhao, Yang and Liu, Dong and Mu, Yadong and Tan, Mingkui and Wang, Xinggang and Liu, Wenyu and Xiao, Bin},
-  journal={TPAMI},
+  author={Jingdong Wang and Ke Sun and Tianheng Cheng and 
+          Borui Jiang and Chaorui Deng and Yang Zhao and Dong Liu and Yadong Mu and 
+          Mingkui Tan and Xinggang Wang and Wenyu Liu and Bin Xiao},
+  journal   = {TPAMI}
   year={2019}
 }
-````
-
+```

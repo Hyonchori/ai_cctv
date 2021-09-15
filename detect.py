@@ -11,14 +11,20 @@ import torch.backends.cudnn as cudnn
 
 FILE = Path(__file__).absolute()
 sys.path.append(os.path.join(FILE.parents[0].as_posix(), "yolov5"))
-
-from models.experimental import attempt_load
-from utils.datasets import LoadStreams, LoadImages
-from utils.general import check_img_size, check_imshow, check_requirements, check_suffix, colorstr, is_ascii, \
+from yolov5.models.experimental import attempt_load
+from yolov5.utils.datasets import LoadStreams, LoadImages
+from yolov5.utils.general import check_img_size, check_imshow, check_requirements, check_suffix, colorstr, is_ascii, \
     non_max_suppression, apply_classifier, scale_coords, xyxy2xywh, strip_optimizer, set_logging, increment_path, \
     save_one_box
-from utils.plots import Annotator, colors
-from utils.torch_utils import select_device, load_classifier, time_sync
+from yolov5.utils.plots import Annotator, colors
+from yolov5.utils.torch_utils import select_device, load_classifier, time_sync
+
+sys.path.append(os.path.join(FILE.parents[0].as_posix(), "hrnet", "custom_lib"))
+from hrnet.custom_lib import hrnet_models
+from hrnet.custom_lib.config import cfg
+from hrnet.custom_lib.config import update_config
+from hrnet.custom_lib.hrnet_utils.inference_utils import draw_pose, box_to_center_scale, \
+    get_pose_estimation_prediction
 
 
 @torch.no_grad()
@@ -38,6 +44,9 @@ def run(opt):
     yolo_hide_conf = opt.yolo_hide_conf
     yolo_half = opt.yolo_half
     yolo_save_crop = opt.yolo_save_crop
+
+    update_config(cfg, opt)
+    hrnet_vis_thr = opt.hrnet_vis_thr
 
     webcam = source.isnumeric() or source.endswith(".txt") or source.lower().startswith(
         ("rtsp://", "rtmp://", "http://", "https://")
@@ -61,6 +70,16 @@ def run(opt):
         yolo_model.half()
     yolo_imgsz = check_img_size(yolo_imgsz, s=stride)
     ascii = is_ascii(names)
+
+    hrnet_model = eval(f"hrnet_models.{cfg.MODEL.NAME}.get_pose_net")(cfg, is_train=False)
+    if cfg.TEST.MODEL_FILE:
+        print('=> loading model from {}'.format(cfg.TEST.MODEL_FILE))
+        hrnet_model.load_state_dict(torch.load(cfg.TEST.MODEL_FILE), strict=False)
+    else:
+        print('expected model defined in config at TEST.MODEL_FILE')
+    hrnet_model = torch.nn.DataParallel(hrnet_model, device_ids=cfg.GPUS)
+    hrnet_model.to(device)
+    hrnet_model.eval()
 
     # DataLoader
     if webcam:
@@ -104,6 +123,7 @@ def run(opt):
             s += "%gx%g " % img.shape[2:]
             gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]
             imc = im0.copy() if yolo_save_crop else im0
+            img_pose = im0.copy()
             annotator = Annotator(im0, line_width=2, pil=not ascii)
             if len(det):
                 # Rescale boxes from img_size to im0 size
@@ -121,6 +141,16 @@ def run(opt):
                     annotator.box_label(xyxy, label, color=colors(c, True))
                     if yolo_save_crop:
                         save_one_box(xyxy, imc, file=save_dir / "crops" / names[c] / f"{p.stem}.jpg", BGR=True)
+
+                    # Keypoint estimation
+                    if c == 0:
+                        box = [(xyxy[0].item(), xyxy[1].item()), (xyxy[2].item(), xyxy[3].item())]
+                        center, scale = box_to_center_scale(box, cfg.MODEL.IMAGE_SIZE[0], cfg.MODEL.IMAGE_SIZE[1])
+                        kp_preds, kp_confs = get_pose_estimation_prediction(hrnet_model, img_pose, center, scale, cfg)
+                        if len(kp_preds) >= 1:
+                            for kpt, kpc in zip(kp_preds, kp_confs):
+                                draw_pose(kpt, im0, kpc, hrnet_vis_thr)
+
 
             # Print time (inference + NMS)
             print(f"{s}Done. ({t2 - t1:.3f}s")
@@ -154,16 +184,25 @@ def parse_opt():
     parser.add_argument("--yolo_weights", nargs="+", type=str, default=yolo_weights)
 
     parser.add_argument("--yolo-imgsz", "--yolo-img", "--iyolo-mg-size", type=int, default=[640])
-    parser.add_argument("--yolo-conf_thr", "--yolo-conf_thres", type=float, default=0.7)
-    parser.add_argument("--yolo-iou-thr", "--yolo-iou-thres", type=float, default=0.5)
+    parser.add_argument("--yolo-conf_thr", "--yolo-conf_thres", type=float, default=0.75)
+    parser.add_argument("--yolo-iou-thr", "--yolo-iou-thres", type=float, default=0.4)
     parser.add_argument("--yolo-max-det", type=int, default=1000)
     parser.add_argument("--yolo-target-classes", nargs="+", type=int)
     parser.add_argument("--yolo-hide-labels", default=False, action="store_true")
     parser.add_argument("--yolo-hide-conf", default=False, action="store_true")
     parser.add_argument("--yolo-half", default=False, action="store_true")
-    parser.add_argument("--yolo-save-crop", default=True, action="store_true")
+    parser.add_argument("--yolo-save-crop", default=False, action="store_true")
+
+    hrnet_cfg = "inference-config.yaml"
+    parser.add_argument("--hrnet-cfg", type=str, default=hrnet_cfg)
+    parser.add_argument("--hrnet-opts", default=[])
+    parser.add_argument("--hrnet-modelDir", default="")
+    parser.add_argument("--hrnet-logDir", default="")
+    parser.add_argument("--hrnet-dataDir", default="")
+    parser.add_argument("--hrnet-vis-thr", type=float, default=0.6)
 
     source = "rtsp://datonai:datonai@172.30.1.49:554/stream1"
+    source = "0"
     parser.add_argument("--source", type=str, default=source)
     parser.add_argument("--device", default="")
     parser.add_argument("--project", default="runs/detect")
