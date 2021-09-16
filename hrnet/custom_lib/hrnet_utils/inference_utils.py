@@ -100,7 +100,6 @@ def box_to_center_scale(box, model_image_width, model_image_height):
 
     aspect_ratio = model_image_width * 1.0 / model_image_height
     pixel_std = 200
-
     if box_width > aspect_ratio * box_height:
         box_height = box_width * 1.0 / aspect_ratio
     elif box_width < aspect_ratio * box_height:
@@ -129,8 +128,31 @@ def get_pose_estimation_prediction(pose_model, image, center, scale, cfg):
         transforms.Normalize(mean=[0.485, 0.456, 0.406],
                              std=[0.229, 0.224, 0.225]),
     ])
-    cv2.imshow("tmp", model_input)
+    #cv2.imshow("tmp", model_input)
 
+    # pose estimation inference
+    model_input = transform(model_input).unsqueeze(0)
+    # switch to evaluate mode
+    pose_model.eval()
+    with torch.no_grad():
+        # compute output heatmap
+        output = pose_model(model_input)
+        preds, confs = get_final_preds(
+            cfg,
+            output.clone().cpu().numpy(),
+            np.asarray([center]),
+            np.asarray([scale]))
+
+        return preds, confs
+
+
+transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                             std=[0.229, 0.224, 0.225]),
+    ])
+def get_pose_estimation_prediction_directly(pose_model, image, center, scale, cfg):
+    model_input = image
     # pose estimation inference
     model_input = transform(model_input).unsqueeze(0)
     # switch to evaluate mode

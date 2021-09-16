@@ -3,6 +3,7 @@ import argparse
 import sys
 import os
 import time
+import numpy as np
 from pathlib import Path
 
 import cv2
@@ -18,13 +19,18 @@ from yolov5.utils.general import check_img_size, check_imshow, check_requirement
     save_one_box
 from yolov5.utils.plots import Annotator, colors
 from yolov5.utils.torch_utils import select_device, load_classifier, time_sync
+from yolov5.utils.augmentations import letterbox
+
+from deep_sort_pytorch.utils.parser import get_config
+from deep_sort_pytorch.deep_sort import DeepSort
+from yolov5.utils.downloads import attempt_download
 
 sys.path.append(os.path.join(FILE.parents[0].as_posix(), "hrnet", "custom_lib"))
 from hrnet.custom_lib import hrnet_models
 from hrnet.custom_lib.config import cfg
 from hrnet.custom_lib.config import update_config
 from hrnet.custom_lib.hrnet_utils.inference_utils import draw_pose, box_to_center_scale, \
-    get_pose_estimation_prediction
+    get_pose_estimation_prediction_directly, get_pose_estimation_prediction
 
 
 @torch.no_grad()
@@ -44,6 +50,10 @@ def run(opt):
     yolo_hide_conf = opt.yolo_hide_conf
     yolo_half = opt.yolo_half
     yolo_save_crop = opt.yolo_save_crop
+
+    deepsort_cfg = get_config()
+    deepsort_cfg.merge_from_file(opt.deepsort_cfg)
+    deepsort_weights = opt.deepsort_weights
 
     update_config(cfg, opt)
     hrnet_vis_thr = opt.hrnet_vis_thr
@@ -71,6 +81,15 @@ def run(opt):
     yolo_imgsz = check_img_size(yolo_imgsz, s=stride)
     ascii = is_ascii(names)
 
+    attempt_download(deepsort_weights, repo='mikel-brostrom/Yolov5_DeepSort_Pytorch')
+    deepsort_model = DeepSort(deepsort_cfg.DEEPSORT.REID_CKPT,
+                              max_dist=deepsort_cfg.DEEPSORT.MAX_DIST,
+                              min_confidence=deepsort_cfg.DEEPSORT.MIN_CONFIDENCE,
+                              max_iou_distance=deepsort_cfg.DEEPSORT.MAX_IOU_DISTANCE,
+                              max_age=deepsort_cfg.DEEPSORT.MAX_AGE, n_init=deepsort_cfg.DEEPSORT.N_INIT,
+                              nn_budget=deepsort_cfg.DEEPSORT.NN_BUDGET,
+                              use_cuda=True)
+
     hrnet_model = eval(f"hrnet_models.{cfg.MODEL.NAME}.get_pose_net")(cfg, is_train=False)
     if cfg.TEST.MODEL_FILE:
         print('=> loading model from {}'.format(cfg.TEST.MODEL_FILE))
@@ -97,6 +116,7 @@ def run(opt):
         yolo_model(torch.zeros(1, 3, *yolo_imgsz).to(device).type_as(next(yolo_model.parameters())))
     t0 = time.time()
     for path, img, im0s, vid_cap in dataset:
+        print("\n---")
         img = torch.from_numpy(img).to(device)
         img = img.half() if yolo_half else img.float()
         img = img / 255.0
@@ -120,11 +140,15 @@ def run(opt):
 
             p = Path(p)
             save_path = str(save_dir / p.name)
+            #save_path = str(save_dir / "video")
             s += "%gx%g " % img.shape[2:]
             gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]
             imc = im0.copy() if yolo_save_crop else im0
             img_pose = im0.copy()
             annotator = Annotator(im0, line_width=2, pil=not ascii)
+
+            bodies = []
+            faces = []
             if len(det):
                 # Rescale boxes from img_size to im0 size
                 det[:, :4] = scale_coords(img.shape[2:], det[:, :4], im0.shape).round()
@@ -134,66 +158,114 @@ def run(opt):
                     n = (det[:, -1] == c).sum()
                     s += f"{n} {names[int(c)]}{'s' * (n > 1)}, "
 
-                # Write results
+                # Pass detection to deepsort
+                clss = det[:, 5]
+                person_idx = clss == 0
+                xywhs = xyxy2xywh(det[:, 0:4])[person_idx]
+                confs = det[:, 4][person_idx]
+                clss = clss[person_idx]
+                outputs = deepsort_model.update(xywhs.cpu(), confs.cpu(), clss.cpu(), im0)
+                #print(outputs)
+
+                # Draw just yolo result
+                '''print(len(det))
                 for *xyxy, conf, cls in reversed(det):
                     c = int(cls)
-                    label = None if yolo_hide_labels else (names[c] if yolo_hide_conf else f"{names[c]} {conf:.2f}")
-                    annotator.box_label(xyxy, label, color=colors(c, True))
-                    if yolo_save_crop:
-                        save_one_box(xyxy, imc, file=save_dir / "crops" / names[c] / f"{p.stem}.jpg", BGR=True)
+                    label = f"{names[c]} {conf:.2f}"
+                    annotator.box_label(xyxy, label, color=colors(c, True))'''
 
-                    # Keypoint estimation
-                    if c == 0:
-                        box = [(xyxy[0].item(), xyxy[1].item()), (xyxy[2].item(), xyxy[3].item())]
-                        center, scale = box_to_center_scale(box, cfg.MODEL.IMAGE_SIZE[0], cfg.MODEL.IMAGE_SIZE[1])
-                        kp_preds, kp_confs = get_pose_estimation_prediction(hrnet_model, img_pose, center, scale, cfg)
-                        if len(kp_preds) >= 1:
-                            for kpt, kpc in zip(kp_preds, kp_confs):
-                                draw_pose(kpt, im0, kpc, hrnet_vis_thr)
+                # Draw visualization
+                if len(outputs) > 0:
+                    for j, (output, conf) in enumerate(zip(reversed(outputs), reversed(confs))):
+                        xyxy = output[0: 4]
+                        id = int(output[4])
+                        cls = output[5]
+                        c = int(cls)
+                        label = f"{id} {names[c]} {conf:.2f}"
+                        annotator.box_label(xyxy, label, color=colors(id, True))
 
+                        if yolo_save_crop:
+                            save_one_box(xyxy, imc, file=save_dir / "crops" / names[c] / f"{p.stem}.jpg", BGR=True)
+
+                        # Append bodies and faces
+                        if c == 0:
+                            bodies.append([*xyxy, conf])
+                        elif c >= 1:
+                            faces.append([*xyxy, conf])
+
+                        # Keypoint estimation
+                        if c == 0:
+                            box = [(xyxy[0].item(), xyxy[1].item()), (xyxy[2].item(), xyxy[3].item())]
+                            center, scale = box_to_center_scale(box, cfg.MODEL.IMAGE_SIZE[0], cfg.MODEL.IMAGE_SIZE[1])
+                            person_crop = img_pose[int(xyxy[1].item()): int(xyxy[3].item()),
+                                          int(xyxy[0].item()): int(xyxy[2].item())]
+                            person_crop_lb, ratio, _ = letterbox(person_crop,
+                                                                 (cfg.MODEL.IMAGE_SIZE[1], cfg.MODEL.IMAGE_SIZE[0]),
+                                                                 auto=False)
+                            re_scale = (1 / ratio[0] * 1.25 * 1.15, 1 / ratio[1] * 1.25)
+
+                            kp_preds, kp_confs = get_pose_estimation_prediction_directly(hrnet_model, person_crop_lb,
+                                                                                         center, re_scale, cfg)
+                            if len(kp_preds) >= 1:
+                                for kpt, kpc in zip(kp_preds, kp_confs):
+                                    pass
+                                    draw_pose(kpt, im0, kpc, hrnet_vis_thr)
+                                    input_kpts = np.hstack((kpt, kpc))
+
+
+
+            # Tracking
+            #print(len(bodies), len(faces))
 
             # Print time (inference + NMS)
             print(f"{s}Done. ({t2 - t1:.3f}s")
 
             # Stream results
             im0 = annotator.result()
-            cv2.imshow(str(p), im0)
-            cv2.waitKey(1)
+            if opt.show_vid:
+                cv2.imshow(str(p), im0)
+                cv2.waitKey(1)
 
-            if dataset.mode == "image":
-                cv2.imwrite(save_path, im0)
-            else:
-                if vid_path[i] != save_path:
-                    vid_path[i] = save_path
-                    if isinstance(vid_writer[i], cv2.VideoWriter):
-                        vid_writer[i].release()
-                    if vid_cap:
-                        fps = vid_cap.get(cv2.CAP_PROP_FPS)
-                        w = int(vid_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-                        h = int(vid_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-                    else:
-                        fps, w, h = 30, im0.shape[1], im0.shape[0]
-                        save_path += ".mp4"
-                    vid_writer[i] = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*"mp4v"), fps, (w, h))
-                vid_writer[i].write(im0)
+            if opt.save_vid:
+                if dataset.mode == "imagae":
+                    cv2.imwrite(save_path, im0)
+                else:
+                    if vid_path[i] != save_path:
+                        vid_path[i] = save_path
+                        if isinstance(vid_writer[i], cv2.VideoWriter):
+                            vid_writer[i].release()
+                        if vid_cap:
+                            fps = vid_cap.get(cv2.CAP_PROP_FPS)
+                            w = int(vid_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+                            h = int(vid_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                        else:
+                            fps, w, h = 30, im0.shape[1], im0.shape[0]
+                            save_path += ".mp4"
+                        vid_writer[i] = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*"mp4v"), fps, (w, h))
+                    vid_writer[i].write(im0)
 
 def parse_opt():
     parser = argparse.ArgumentParser()
 
     yolo_weights = "weights/yolov5l_crowdhuman_v2.pt"
+    #yolo_weights = "yolov5x.pt"
     parser.add_argument("--yolo_weights", nargs="+", type=str, default=yolo_weights)
 
     parser.add_argument("--yolo-imgsz", "--yolo-img", "--iyolo-mg-size", type=int, default=[640])
-    parser.add_argument("--yolo-conf_thr", "--yolo-conf_thres", type=float, default=0.75)
-    parser.add_argument("--yolo-iou-thr", "--yolo-iou-thres", type=float, default=0.4)
+    parser.add_argument("--yolo-conf_thr", "--yolo-conf_thres", type=float, default=0.65)
+    parser.add_argument("--yolo-iou-thr", "--yolo-iou-thres", type=float, default=0.3)
     parser.add_argument("--yolo-max-det", type=int, default=1000)
-    parser.add_argument("--yolo-target-classes", nargs="+", type=int)
+    parser.add_argument("--yolo-target-classes", default=None, nargs="+", type=int)
     parser.add_argument("--yolo-hide-labels", default=False, action="store_true")
     parser.add_argument("--yolo-hide-conf", default=False, action="store_true")
     parser.add_argument("--yolo-half", default=False, action="store_true")
     parser.add_argument("--yolo-save-crop", default=False, action="store_true")
 
+    parser.add_argument("--deepsort-cfg", type=str, default="deep_sort_pytorch/configs/deep_sort.yaml")
+    parser.add_argument("--deepsort-weights", type=str, default="deep_sort_pytorch/deep_sort/deep/checkpoint/ckpt.t7")
+
     hrnet_cfg = "inference-config.yaml"
+    #hrnet_cfg = "hrnet_config.yaml"
     parser.add_argument("--hrnet-cfg", type=str, default=hrnet_cfg)
     parser.add_argument("--hrnet-opts", default=[])
     parser.add_argument("--hrnet-modelDir", default="")
@@ -202,11 +274,17 @@ def parse_opt():
     parser.add_argument("--hrnet-vis-thr", type=float, default=0.6)
 
     source = "rtsp://datonai:datonai@172.30.1.49:554/stream1"
-    source = "0"
+    #source = "http://211.254.214.79:4980/vod/2021/07/16/3-9_2_171/index.m3u8"
+    #source = "rtmp://211.254.214.79:4988/CH/CH-0001-zzl5qcmgxg"
+    #source = "/media/daton/D6A88B27A88B0569/dataset/mot/MOT17/test/MOT17-03-DPM/img1"
+    #source = "/media/daton/D6A88B27A88B0569/dataset/사람동작 영상/이미지/image_action_45/image_45-2/45-2/45-2_001-C02"
+    #source = "0"
     parser.add_argument("--source", type=str, default=source)
     parser.add_argument("--device", default="")
     parser.add_argument("--project", default="runs/detect")
     parser.add_argument("--name", default="exp")
+    parser.add_argument("--save-vid", type=bool, default=True)
+    parser.add_argument("--show-vid", type=bool, default=True)
 
     opt = parser.parse_args()
     opt.yolo_imgsz *= 2 if len(opt.yolo_imgsz) == 1 else 1  # expand
