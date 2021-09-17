@@ -82,13 +82,6 @@ def run(opt):
     ascii = is_ascii(names)
 
     attempt_download(deepsort_weights, repo='mikel-brostrom/Yolov5_DeepSort_Pytorch')
-    deepsort_model = DeepSort(deepsort_cfg.DEEPSORT.REID_CKPT,
-                              max_dist=deepsort_cfg.DEEPSORT.MAX_DIST,
-                              min_confidence=deepsort_cfg.DEEPSORT.MIN_CONFIDENCE,
-                              max_iou_distance=deepsort_cfg.DEEPSORT.MAX_IOU_DISTANCE,
-                              max_age=deepsort_cfg.DEEPSORT.MAX_AGE, n_init=deepsort_cfg.DEEPSORT.N_INIT,
-                              nn_budget=deepsort_cfg.DEEPSORT.NN_BUDGET,
-                              use_cuda=True)
 
     hrnet_model = eval(f"hrnet_models.{cfg.MODEL.NAME}.get_pose_net")(cfg, is_train=False)
     if cfg.TEST.MODEL_FILE:
@@ -110,6 +103,13 @@ def run(opt):
         dataset = LoadImages(source, img_size=yolo_imgsz, stride=stride, auto=True)
         bs = 1
     vid_path, vid_writer = [None] * bs, [None] * bs
+    deepsort_model_list = [DeepSort(deepsort_cfg.DEEPSORT.REID_CKPT,
+                           max_dist=deepsort_cfg.DEEPSORT.MAX_DIST,
+                           min_confidence=deepsort_cfg.DEEPSORT.MIN_CONFIDENCE,
+                           max_iou_distance=deepsort_cfg.DEEPSORT.MAX_IOU_DISTANCE,
+                           max_age=deepsort_cfg.DEEPSORT.MAX_AGE, n_init=deepsort_cfg.DEEPSORT.N_INIT,
+                           nn_budget=deepsort_cfg.DEEPSORT.NN_BUDGET,
+                           use_cuda=True) for _ in range(bs)]
 
     # Run inference
     if device.type != "cpu":
@@ -167,8 +167,7 @@ def run(opt):
                 xywhs = xyxy2xywh(det[:, 0:4])[person_idx]
                 confs = det[:, 4][person_idx]
                 clss = clss[person_idx]
-                outputs = deepsort_model.update(xywhs.cpu(), confs.cpu(), clss.cpu(), im0)
-                #print(outputs)
+                outputs = deepsort_model_list[i].update(xywhs.cpu(), confs.cpu(), clss.cpu(), im0)
 
 
                 # Draw visualization
@@ -228,7 +227,7 @@ def run(opt):
 
             # Print time (inference + NMS)
             t3 = time_sync()
-            print(f"{s}Done. ({t3 - t1:.3f}s")
+            print(f"{s}Done. ({t3 - t1:.3f}s)")
 
             # Stream results
             im0 = annotator.result()
@@ -283,6 +282,7 @@ def parse_opt():
     parser.add_argument("--hrnet-vis-thr", type=float, default=0.6)
 
     source = "rtsp://datonai:datonai@172.30.1.49:554/stream1"
+    source = "source.txt"
     #source = "http://211.254.214.79:4980/vod/2021/07/16/3-9_2_171/index.m3u8"
     #source = "rtmp://211.254.214.79:4988/CH/CH-0001-zzl5qcmgxg"
     #source = "/media/daton/D6A88B27A88B0569/dataset/mot/MOT17/test/MOT17-03-DPM/img1"
