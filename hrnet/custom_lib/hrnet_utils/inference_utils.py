@@ -151,19 +151,19 @@ transform = transforms.Compose([
         transforms.Normalize(mean=[0.485, 0.456, 0.406],
                              std=[0.229, 0.224, 0.225]),
     ])
-def get_pose_estimation_prediction_directly(pose_model, image, center, scale, cfg):
-    model_input = image
-    # pose estimation inference
-    model_input = transform(model_input).unsqueeze(0)
+def get_pose_estimation_prediction_from_batch(pose_model, image_batch, centers, scales, cfg):
     # switch to evaluate mode
     pose_model.eval()
     with torch.no_grad():
         # compute output heatmap
-        output = pose_model(model_input)
-        preds, confs = get_final_preds(
-            cfg,
-            output.clone().cpu().numpy(),
-            np.asarray([center]),
-            np.asarray([scale]))
-
-        return preds, confs
+        output = pose_model(image_batch)
+        pred_list, conf_list = [], []
+        for o, center, scale in zip(output, centers, scales):
+            pred, conf = get_final_preds(
+                cfg,
+                o.unsqueeze(0).cpu().numpy(),
+                np.asarray([center]),
+                np.asarray([scale]))
+            pred_list.append(pred)
+            conf_list.append(conf)
+        return pred_list, conf_list

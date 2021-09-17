@@ -30,7 +30,7 @@ from hrnet.custom_lib import hrnet_models
 from hrnet.custom_lib.config import cfg
 from hrnet.custom_lib.config import update_config
 from hrnet.custom_lib.hrnet_utils.inference_utils import draw_pose, box_to_center_scale, \
-    get_pose_estimation_prediction_directly, get_pose_estimation_prediction
+    get_pose_estimation_prediction_from_batch, get_pose_estimation_prediction, transform
 
 
 @torch.no_grad()
@@ -123,6 +123,9 @@ def run(opt):
         if len(img.shape) == 3:
             img = img[None]
 
+        '''cv2.imshow('img', im0s[0])
+        cv2.waitKey(1)'''
+
         # Inference
         t1 = time_sync()
         pred = yolo_model(img)[0]
@@ -140,7 +143,7 @@ def run(opt):
 
             p = Path(p)
             save_path = str(save_dir / p.name)
-            #save_path = str(save_dir / "video")
+            save_path = str(save_dir / "video")
             s += "%gx%g " % img.shape[2:]
             gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]
             imc = im0.copy() if yolo_save_crop else im0
@@ -167,14 +170,11 @@ def run(opt):
                 outputs = deepsort_model.update(xywhs.cpu(), confs.cpu(), clss.cpu(), im0)
                 #print(outputs)
 
-                # Draw just yolo result
-                '''print(len(det))
-                for *xyxy, conf, cls in reversed(det):
-                    c = int(cls)
-                    label = f"{names[c]} {conf:.2f}"
-                    annotator.box_label(xyxy, label, color=colors(c, True))'''
 
                 # Draw visualization
+                cropped_person_batch = []
+                person_centers = []
+                person_scales = []
                 if len(outputs) > 0:
                     for j, (output, conf) in enumerate(zip(reversed(outputs), reversed(confs))):
                         xyxy = output[0: 4]
@@ -182,6 +182,7 @@ def run(opt):
                         cls = output[5]
                         c = int(cls)
                         label = f"{id} {names[c]} {conf:.2f}"
+                        print(xyxy)
                         annotator.box_label(xyxy, label, color=colors(id, True))
 
                         if yolo_save_crop:
@@ -196,21 +197,29 @@ def run(opt):
                         # Keypoint estimation
                         if c == 0:
                             box = [(xyxy[0].item(), xyxy[1].item()), (xyxy[2].item(), xyxy[3].item())]
-                            center, scale = box_to_center_scale(box, cfg.MODEL.IMAGE_SIZE[0], cfg.MODEL.IMAGE_SIZE[1])
-                            person_crop = img_pose[int(xyxy[1].item()): int(xyxy[3].item()),
-                                          int(xyxy[0].item()): int(xyxy[2].item())]
+                            person_crop = img_pose[int(box[0][1]): int(box[1][1]),
+                                          int(box[0][0]): int(box[1][0])]
                             person_crop_lb, ratio, _ = letterbox(person_crop,
                                                                  (cfg.MODEL.IMAGE_SIZE[1], cfg.MODEL.IMAGE_SIZE[0]),
                                                                  auto=False)
-                            re_scale = (1 / ratio[0] * 1.25 * 1.15, 1 / ratio[1] * 1.25)
+                            if 0 in ratio:
+                                continue
+                            center = [(box[0][0] + box[1][0]) / 2, (box[0][1] + box[1][1]) / 2]
+                            re_scale = [1 / ratio[0] * 1.25 * 1.15, 1 / ratio[1] * 1.25]
 
-                            kp_preds, kp_confs = get_pose_estimation_prediction_directly(hrnet_model, person_crop_lb,
-                                                                                         center, re_scale, cfg)
-                            if len(kp_preds) >= 1:
-                                for kpt, kpc in zip(kp_preds, kp_confs):
-                                    pass
-                                    draw_pose(kpt, im0, kpc, hrnet_vis_thr)
-                                    input_kpts = np.hstack((kpt, kpc))
+                            cropped_person_batch.append(transform(person_crop_lb).unsqueeze(0))
+                            person_centers.append(center)
+                            person_scales.append(re_scale)
+
+                    cropped_person_batch = torch.cat(cropped_person_batch)
+                    kp_preds, kp_confs = get_pose_estimation_prediction_from_batch(hrnet_model,
+                                                                                   cropped_person_batch,
+                                                                                   person_centers,
+                                                                                   person_scales,
+                                                                                   cfg)
+                    for kp_pred, kp_conf in zip(kp_preds, kp_confs):
+                        for kpt, kpc in zip(kp_pred, kp_conf):
+                            draw_pose(kpt, im0, kpc, hrnet_vis_thr)
 
 
 
@@ -218,7 +227,8 @@ def run(opt):
             #print(len(bodies), len(faces))
 
             # Print time (inference + NMS)
-            print(f"{s}Done. ({t2 - t1:.3f}s")
+            t3 = time_sync()
+            print(f"{s}Done. ({t3 - t1:.3f}s")
 
             # Stream results
             im0 = annotator.result()
@@ -250,9 +260,8 @@ def parse_opt():
     yolo_weights = "weights/yolov5l_crowdhuman_v2.pt"
     #yolo_weights = "yolov5x.pt"
     parser.add_argument("--yolo_weights", nargs="+", type=str, default=yolo_weights)
-
     parser.add_argument("--yolo-imgsz", "--yolo-img", "--iyolo-mg-size", type=int, default=[640])
-    parser.add_argument("--yolo-conf_thr", "--yolo-conf_thres", type=float, default=0.65)
+    parser.add_argument("--yolo-conf_thr", "--yolo-conf_thres", type=float, default=0.55)
     parser.add_argument("--yolo-iou-thr", "--yolo-iou-thres", type=float, default=0.3)
     parser.add_argument("--yolo-max-det", type=int, default=1000)
     parser.add_argument("--yolo-target-classes", default=None, nargs="+", type=int)
@@ -278,6 +287,7 @@ def parse_opt():
     #source = "rtmp://211.254.214.79:4988/CH/CH-0001-zzl5qcmgxg"
     #source = "/media/daton/D6A88B27A88B0569/dataset/mot/MOT17/test/MOT17-03-DPM/img1"
     #source = "/media/daton/D6A88B27A88B0569/dataset/사람동작 영상/이미지/image_action_45/image_45-2/45-2/45-2_001-C02"
+    #source = "https://www.youtube.com/watch?v=-gSOi6diYzI"
     #source = "0"
     parser.add_argument("--source", type=str, default=source)
     parser.add_argument("--device", default="")
