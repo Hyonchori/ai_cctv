@@ -1,12 +1,11 @@
-
 import argparse
 import sys
 import os
 import time
-import numpy as np
 from pathlib import Path
 
 import cv2
+import numpy as np
 import torch
 import torch.backends.cudnn as cudnn
 
@@ -31,6 +30,8 @@ from hrnet.custom_lib.config import cfg
 from hrnet.custom_lib.config import update_config
 from hrnet.custom_lib.hrnet_utils.inference_utils import draw_pose, box_to_center_scale, \
     get_pose_estimation_prediction_from_batch, get_pose_estimation_prediction, transform
+
+from sensing_mode import RoI, SenseTrespassing, SenseLoitering
 
 
 @torch.no_grad()
@@ -111,6 +112,10 @@ def run(opt):
                            nn_budget=deepsort_cfg.DEEPSORT.NN_BUDGET,
                            use_cuda=True) for _ in range(bs)]
 
+
+    roi = RoI()
+    roi = SenseTrespassing(colors=colors)
+
     # Run inference
     if device.type != "cpu":
         yolo_model(torch.zeros(1, 3, *yolo_imgsz).to(device).type_as(next(yolo_model.parameters())))
@@ -123,6 +128,13 @@ def run(opt):
         if len(img.shape) == 3:
             img = img[None]
 
+        if roi.img_size == None:
+            print(im0s[0].shape)
+            if len(im0s[0].shape) == 3:
+                roi.img_size = im0s[0].shape
+            else:
+                roi.img_size = im0s.shape
+            roi.ref_img = np.zeros(roi.img_size, np.uint8)
         # Inference
         t1 = time_sync()
         pred = yolo_model(img)[0]
@@ -152,6 +164,7 @@ def run(opt):
             if len(det):
                 # Rescale boxes from img_size to im0 size
                 det[:, :4] = scale_coords(img.shape[2:], det[:, :4], im0.shape).round()
+                roi.update(det)
                 '''for *xyxy, conf, cls in reversed(det):
                     c = int(cls)
                     if c == 0:
@@ -185,9 +198,9 @@ def run(opt):
                         c = int(cls)
                         label = f"{id} {names[c]} {conf:.2f}"
                         label = f"{names[c]}"
-                        annotator.box_label(xyxy, label, color=colors(id, True))
+                        #annotator.box_label(xyxy, label, color=colors(id, True))
 
-                        if yolo_save_crop:
+                        '''if yolo_save_crop:
                             save_one_box(xyxy, imc, file=save_dir / "crops" / names[c] / f"{p.stem}.jpg", BGR=True)
 
                         # Append bodies and faces
@@ -211,17 +224,17 @@ def run(opt):
 
                             cropped_person_batch.append(transform(person_crop_lb).unsqueeze(0))
                             person_centers.append(center)
-                            person_scales.append(re_scale)
-
-                    cropped_person_batch = torch.cat(cropped_person_batch)
-                    kp_preds, kp_confs = get_pose_estimation_prediction_from_batch(hrnet_model,
-                                                                                   cropped_person_batch,
-                                                                                   person_centers,
-                                                                                   person_scales,
-                                                                                   cfg)
-                    for kp_pred, kp_conf in zip(kp_preds, kp_confs):
-                        for kpt, kpc in zip(kp_pred, kp_conf):
-                            draw_pose(kpt, im0, kpc, hrnet_vis_thr)
+                            person_scales.append(re_scale)'''
+                    '''if cropped_person_batch:
+                        cropped_person_batch = torch.cat(cropped_person_batch)
+                        kp_preds, kp_confs = get_pose_estimation_prediction_from_batch(hrnet_model,
+                                                                                       cropped_person_batch,
+                                                                                       person_centers,
+                                                                                       person_scales,
+                                                                                       cfg)
+                        for kp_pred, kp_conf in zip(kp_preds, kp_confs):
+                            for kpt, kpc in zip(kp_pred, kp_conf):
+                                draw_pose(kpt, im0, kpc, hrnet_vis_thr)'''
 
 
             # Tracking
@@ -234,7 +247,8 @@ def run(opt):
             # Stream results
             im0 = annotator.result()
             if opt.show_vid:
-                cv2.imshow(str(p), im0)
+                #cv2.imshow(str(p), im0)
+                im0 = roi.imshow(im0)
                 cv2.waitKey(1)
 
             if opt.save_vid:
@@ -287,14 +301,14 @@ def parse_opt():
     #source = "source.txt"
     #source = "http://211.254.214.79:4980/vod/2021/07/16/3-9_2_171/index.m3u8"
     #source = "rtmp://211.254.214.79:4988/CH/CH-0001-zzl5qcmgxg"
-    #source = "/media/daton/D6A88B27A88B0569/dataset/mot/MOT17/test/MOT17-03-DPM/img1"
+    source = "/media/daton/D6A88B27A88B0569/dataset/mot/MOT17/test/MOT17-03-DPM/img1"
     #source = "/media/daton/D6A88B27A88B0569/dataset/사람동작 영상/이미지/image_action_45/image_45-2/45-2/45-2_001-C02"
     #source = "https://www.youtube.com/watch?v=-gSOi6diYzI"
     #source = "https://www.youtube.com/watch?v=gwavBeK4H1Q"
     #source = "0"
     parser.add_argument("--source", type=str, default=source)
     parser.add_argument("--device", default="")
-    parser.add_argument("--project", default="runs/detect")
+    parser.add_argument("--project", default="runs/detect_one_video")
     parser.add_argument("--name", default="exp")
     parser.add_argument("--save-vid", type=bool, default=True)
     parser.add_argument("--show-vid", type=bool, default=True)
