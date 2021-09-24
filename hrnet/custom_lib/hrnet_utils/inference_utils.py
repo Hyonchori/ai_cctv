@@ -8,6 +8,21 @@ from core.function import get_final_preds
 from hrnet_utils.transforms import get_affine_transform
 
 
+COCO_INSTANCE_CATEGORY_NAMES = [
+    '__background__', 'person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus',
+    'train', 'truck', 'boat', 'traffic light', 'fire hydrant', 'N/A', 'stop sign',
+    'parking meter', 'bench', 'bird', 'cat', 'dog', 'horse', 'sheep', 'cow',
+    'elephant', 'bear', 'zebra', 'giraffe', 'N/A', 'backpack', 'umbrella', 'N/A', 'N/A',
+    'handbag', 'tie', 'suitcase', 'frisbee', 'skis', 'snowboard', 'sports ball',
+    'kite', 'baseball bat', 'baseball glove', 'skateboard', 'surfboard', 'tennis racket',
+    'bottle', 'N/A', 'wine glass', 'cup', 'fork', 'knife', 'spoon', 'bowl',
+    'banana', 'apple', 'sandwich', 'orange', 'broccoli', 'carrot', 'hot dog', 'pizza',
+    'donut', 'cake', 'chair', 'couch', 'potted plant', 'bed', 'N/A', 'dining table',
+    'N/A', 'N/A', 'toilet', 'N/A', 'tv', 'laptop', 'mouse', 'remote', 'keyboard', 'cell phone',
+    'microwave', 'oven', 'toaster', 'sink', 'refrigerator', 'N/A', 'book',
+    'clock', 'vase', 'scissors', 'teddy bear', 'hair drier', 'toothbrush'
+]
+
 COCO_KEYPOINT_INDEXES = {
     0: 'nose',
     1: 'left_eye',
@@ -28,23 +43,24 @@ COCO_KEYPOINT_INDEXES = {
     16: 'right_ankle'
 }
 
-COCO_INSTANCE_CATEGORY_NAMES = [
-    '__background__', 'person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus',
-    'train', 'truck', 'boat', 'traffic light', 'fire hydrant', 'N/A', 'stop sign',
-    'parking meter', 'bench', 'bird', 'cat', 'dog', 'horse', 'sheep', 'cow',
-    'elephant', 'bear', 'zebra', 'giraffe', 'N/A', 'backpack', 'umbrella', 'N/A', 'N/A',
-    'handbag', 'tie', 'suitcase', 'frisbee', 'skis', 'snowboard', 'sports ball',
-    'kite', 'baseball bat', 'baseball glove', 'skateboard', 'surfboard', 'tennis racket',
-    'bottle', 'N/A', 'wine glass', 'cup', 'fork', 'knife', 'spoon', 'bowl',
-    'banana', 'apple', 'sandwich', 'orange', 'broccoli', 'carrot', 'hot dog', 'pizza',
-    'donut', 'cake', 'chair', 'couch', 'potted plant', 'bed', 'N/A', 'dining table',
-    'N/A', 'N/A', 'toilet', 'N/A', 'tv', 'laptop', 'mouse', 'remote', 'keyboard', 'cell phone',
-    'microwave', 'oven', 'toaster', 'sink', 'refrigerator', 'N/A', 'book',
-    'clock', 'vase', 'scissors', 'teddy bear', 'hair drier', 'toothbrush'
-]
-
 SKELETON = [
-    [1,3],[1,0],[2,4],[2,0],[0,5],[0,6],[5,7],[7,9],[6,8],[8,10],[5,11],[6,12],[11,12],[11,13],[13,15],[12,14],[14,16]
+    [1, 3],  # left eye 2 left ear
+    [1, 0],  # left eye 2 nose
+    [2, 4],  # right eye 2 right ear
+    [2, 0],  # right eye 2 nose
+    [0, 5],  #
+    [0, 6],
+    [5, 7],
+    [7, 9],
+    [6, 8],
+    [8, 10],
+    [5, 11],
+    [6, 12],
+    [11, 12],
+    [11, 13],
+    [13, 15],
+    [12, 14],
+    [14, 16]
 ]
 
 CocoColors = [[255, 0, 0], [255, 85, 0], [255, 170, 0], [255, 255, 0], [170, 255, 0], [85, 255, 0], [0, 255, 0],
@@ -70,6 +86,33 @@ def draw_pose(keypoints, img, confs, vis_thr=0.4):
         cv2.circle(img, (int(x_a), int(y_a)), 6, CocoColors[i], -1)
         cv2.circle(img, (int(x_b), int(y_b)), 6, CocoColors[i], -1)
         cv2.line(img, (int(x_a), int(y_a)), (int(x_b), int(y_b)), CocoColors[i], 2)
+
+
+def draw_keypoints(keypoints, img, confs, min_thr=0.4, max_thr=0.7):
+    assert keypoints.shape == (NUM_KPTS, 2)
+    for i in range(len(SKELETON)):
+        ref_img = np.zeros_like(img, np.uint8)
+        kpt_a, kpt_b = SKELETON[i][0], SKELETON[i][1]
+        conf_a, conf_b = confs[kpt_a][0], confs[kpt_b][0]
+        x_a, y_a = keypoints[kpt_a][0], keypoints[kpt_a][1]
+        x_b, y_b = keypoints[kpt_b][0], keypoints[kpt_b][1]
+        cv2.circle(ref_img, (int(x_a), int(y_a)), 6, CocoColors[i], -1)
+        cv2.circle(ref_img, (int(x_b), int(y_b)), 6, CocoColors[i], -1)
+        cv2.line(ref_img, (int(x_a), int(y_a)), (int(x_b), int(y_b)), CocoColors[i], 2)
+
+        conf = (conf_a + conf_b) / 2
+        conf = conf / 2 if conf < min_thr else 1
+        tmp_result = cv2.addWeighted(img, 1 - conf, ref_img, conf, 0)
+        cv2.copyTo(tmp_result, ref_img, img)
+
+
+def get_action_input(keypoints, confs):
+    kp_in = []
+    for i in range(len(SKELETON)):
+        kpt_a, kpt_b = SKELETON[i][0], SKELETON[i][1]
+        conf_a, conf_b = confs[kpt_a][0], confs[kpt_b][0]
+        x_a, y_a = keypoints[kpt_a][0], keypoints[kpt_a][1]
+        x_b, y_b = keypoints[kpt_b][0], keypoints[kpt_b][1]
 
 
 def box_to_center_scale(box, model_image_width, model_image_height):

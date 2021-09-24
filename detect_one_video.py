@@ -115,6 +115,12 @@ def run(opt):
 
     roi = RoI()
     roi = SenseTrespassing(colors=colors)
+    target_fps = dataset.fps if hasattr(dataset, "fps") else 15
+    target_fps = target_fps[0] if isinstance(target_fps, list) else target_fps
+    roi = SenseLoitering(colors=colors,
+                         fps=target_fps,
+                         max_buffer_size=target_fps * 15,
+                         time_thr=10)
 
     # Run inference
     if device.type != "cpu":
@@ -129,7 +135,6 @@ def run(opt):
             img = img[None]
 
         if roi.img_size == None:
-            print(im0s[0].shape)
             if len(im0s[0].shape) == 3:
                 roi.img_size = im0s[0].shape
             else:
@@ -152,7 +157,7 @@ def run(opt):
 
             p = Path(p)
             save_path = str(save_dir / p.name)
-            save_path = str(save_dir / "video")
+            #save_path = str(save_dir / "video")
             s += "%gx%g " % img.shape[2:]
             gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]
             imc = im0.copy() if yolo_save_crop else im0
@@ -164,7 +169,7 @@ def run(opt):
             if len(det):
                 # Rescale boxes from img_size to im0 size
                 det[:, :4] = scale_coords(img.shape[2:], det[:, :4], im0.shape).round()
-                roi.update(det)
+                #roi.update(det)
                 '''for *xyxy, conf, cls in reversed(det):
                     c = int(cls)
                     if c == 0:
@@ -184,7 +189,7 @@ def run(opt):
                 confs = det[:, 4][person_idx]
                 clss = clss[person_idx]
                 outputs = deepsort_model_list[i].update(xywhs.cpu(), confs.cpu(), clss.cpu(), im0)
-
+                roi.update(outputs)
 
                 # Draw visualization
                 cropped_person_batch = []
@@ -236,6 +241,9 @@ def run(opt):
                             for kpt, kpc in zip(kp_pred, kp_conf):
                                 draw_pose(kpt, im0, kpc, hrnet_vis_thr)'''
 
+            else:
+                deepsort_model_list[i].increment_ages()
+                roi.update([])
 
             # Tracking
             #print(len(bodies), len(faces))
@@ -267,6 +275,7 @@ def run(opt):
                             fps, w, h = 30, im0.shape[1], im0.shape[0]
                             save_path += ".mp4"
                         vid_writer[i] = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*"mp4v"), fps, (w, h))
+                    print("???")
                     vid_writer[i].write(im0)
 
 def parse_opt():
@@ -301,7 +310,8 @@ def parse_opt():
     #source = "source.txt"
     #source = "http://211.254.214.79:4980/vod/2021/07/16/3-9_2_171/index.m3u8"
     #source = "rtmp://211.254.214.79:4988/CH/CH-0001-zzl5qcmgxg"
-    source = "/media/daton/D6A88B27A88B0569/dataset/mot/MOT17/test/MOT17-03-DPM/img1"
+    #source = "/media/daton/D6A88B27A88B0569/dataset/mot/MOT17/test/MOT17-03-DPM/img1"
+    #source = "/home/daton/Downloads/bandicam 2021-09-24 05-22-34-452.mp4"
     #source = "/media/daton/D6A88B27A88B0569/dataset/사람동작 영상/이미지/image_action_45/image_45-2/45-2/45-2_001-C02"
     #source = "https://www.youtube.com/watch?v=-gSOi6diYzI"
     #source = "https://www.youtube.com/watch?v=gwavBeK4H1Q"

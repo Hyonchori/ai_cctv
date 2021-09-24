@@ -30,7 +30,8 @@ from hrnet.custom_lib import hrnet_models
 from hrnet.custom_lib.config import cfg
 from hrnet.custom_lib.config import update_config
 from hrnet.custom_lib.hrnet_utils.inference_utils import draw_pose, box_to_center_scale, \
-    get_pose_estimation_prediction_from_batch, get_pose_estimation_prediction, transform
+    get_pose_estimation_prediction_from_batch, get_pose_estimation_prediction, transform, \
+    draw_keypoints
 
 
 @torch.no_grad()
@@ -175,6 +176,7 @@ def run(opt):
 
                 # Draw visualization
                 cropped_person_batch = []
+                person_heights = []
                 person_centers = []
                 person_scales = []
                 if len(outputs) > 0:
@@ -219,9 +221,13 @@ def run(opt):
                                                                                    person_centers,
                                                                                    person_scales,
                                                                                    cfg)
+                    print(len(kp_preds), len(person_centers))
                     for kp_pred, kp_conf in zip(kp_preds, kp_confs):
                         for kpt, kpc in zip(kp_pred, kp_conf):
-                            draw_pose(kpt, im0, kpc, hrnet_vis_thr)
+                            draw_keypoints(kpt, im0, kpc, hrnet_vis_thr)
+
+                            kpin_simple = np.hstack((kpt, kpc))
+                            kpin_simple = torch.from_numpy(kpin_simple).view(1, -1).to(device)
 
 
             # Tracking
@@ -296,7 +302,7 @@ def parse_opt():
     parser.add_argument("--device", default="")
     parser.add_argument("--project", default="runs/detect")
     parser.add_argument("--name", default="exp")
-    parser.add_argument("--save-vid", type=bool, default=True)
+    parser.add_argument("--save-vid", type=bool, default=False)
     parser.add_argument("--show-vid", type=bool, default=True)
 
     opt = parser.parse_args()
