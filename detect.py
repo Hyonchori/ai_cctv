@@ -171,7 +171,7 @@ def run(opt):
                 xywhs = xyxy2xywh(det[:, 0:4])[person_idx]
                 confs = det[:, 4][person_idx]
                 clss = clss[person_idx]
-                outputs = deepsort_model_list[i].update(xywhs.cpu(), confs.cpu(), clss.cpu(), im0)
+                #outputs = deepsort_model_list[i].update(xywhs.cpu(), confs.cpu(), clss.cpu(), im0)
 
 
                 # Draw visualization
@@ -179,7 +179,7 @@ def run(opt):
                 person_heights = []
                 person_centers = []
                 person_scales = []
-                if len(outputs) > 0:
+                '''if len(outputs) > 0:
                     for j, (output, conf) in enumerate(zip(reversed(outputs), reversed(confs))):
                         xyxy = output[0: 4]
                         id = int(output[4])
@@ -196,9 +196,10 @@ def run(opt):
                         if c == 0:
                             bodies.append([*xyxy, conf])
                         elif c >= 1:
-                            faces.append([*xyxy, conf])
+                            faces.append([*xyxy, conf])'''
 
                         # Keypoint estimation
+                '''
                         if c == 0:
                             box = [(xyxy[0].item(), xyxy[1].item()), (xyxy[2].item(), xyxy[3].item())]
                             person_crop = img_pose[int(box[0][1]): int(box[1][1]),
@@ -227,7 +228,7 @@ def run(opt):
                             draw_keypoints(kpt, im0, kpc, hrnet_vis_thr)
 
                             kpin_simple = np.hstack((kpt, kpc))
-                            kpin_simple = torch.from_numpy(kpin_simple).view(1, -1).to(device)
+                            kpin_simple = torch.from_numpy(kpin_simple).view(1, -1).to(device)'''
 
 
             # Tracking
@@ -294,7 +295,9 @@ def parse_opt():
     #source = "http://211.254.214.79:4980/vod/2021/07/16/3-9_2_171/index.m3u8"
     #source = "rtmp://211.254.214.79:4988/CH/CH-0001-zzl5qcmgxg"
     #source = "/media/daton/D6A88B27A88B0569/dataset/mot/MOT17/test/MOT17-03-DPM/img1"
-    #source = "/media/daton/D6A88B27A88B0569/dataset/사람동작 영상/이미지/image_action_45/image_45-2/45-2/45-2_001-C02"
+    #source = "/media/daton/D6A88B27A88B0569/dataset/mot/MOT17/train/MOT17-11-DPM/img1"
+    #source = "/media/daton/D6A88B27A88B0569/dataset/mot/MOT17/test/MOT17-08-DPM/img1"
+    #source = "/media/daton/D6A88B27A88B0569/dataset/사람동작 영상/이미지/image_action_45/image_45-1/45-1/45-1_001-C01"
     #source = "https://www.youtube.com/watch?v=-gSOi6diYzI"
     #source = "https://www.youtube.com/watch?v=gwavBeK4H1Q"
     #source = "0"
@@ -302,7 +305,7 @@ def parse_opt():
     parser.add_argument("--device", default="")
     parser.add_argument("--project", default="runs/detect")
     parser.add_argument("--name", default="exp")
-    parser.add_argument("--save-vid", type=bool, default=False)
+    parser.add_argument("--save-vid", type=bool, default=True)
     parser.add_argument("--show-vid", type=bool, default=True)
 
     opt = parser.parse_args()

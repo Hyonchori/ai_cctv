@@ -120,7 +120,7 @@ class SenseTrespassing(RoI):
         tl = (int(bbox[0]), int(bbox[1]))
         br = (int(bbox[2]), int(bbox[3]))
         if sensed:
-            label = "Trepassing"
+            label = "Trespassing"
             color = self.colors(0, True)
         else:
             label = "person"
@@ -240,5 +240,5 @@ class SenseLoitering(RoI):
         )
         cv2.putText(tmp_img, label, (tl[0], tl[1] + 9),
                     cv2.FONT_HERSHEY_PLAIN, font_scale, [255, 255, 255], fonst_thick, lineType=cv2.LINE_AA)
-        tmp_result = cv2.addWeighted(img, 0.8, tmp_img, 0.4, 0)
+        tmp_result = cv2.addWeighted(img, 0.8, tmp_img, 0.6, 0)
         cv2.copyTo(tmp_result, tmp_img, img)

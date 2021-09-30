@@ -29,7 +29,7 @@ from hrnet.custom_lib import hrnet_models
 from hrnet.custom_lib.config import cfg
 from hrnet.custom_lib.config import update_config
 from hrnet.custom_lib.hrnet_utils.inference_utils import draw_pose, box_to_center_scale, \
-    get_pose_estimation_prediction_from_batch, get_pose_estimation_prediction, transform
+    get_pose_estimation_prediction_from_batch, get_pose_estimation_prediction, transform, draw_keypoints
 
 from sensing_mode import RoI, SenseTrespassing, SenseLoitering
 
@@ -131,6 +131,13 @@ def run(opt):
         img = torch.from_numpy(img).to(device)
         img = img.half() if yolo_half else img.float()
         img = img / 255.0
+
+
+        '''cv2.imshow("img", im0s[0])
+        cv2.waitKey(1)
+        continue'''
+
+
         if len(img.shape) == 3:
             img = img[None]
 
@@ -170,17 +177,12 @@ def run(opt):
                 # Rescale boxes from img_size to im0 size
                 det[:, :4] = scale_coords(img.shape[2:], det[:, :4], im0.shape).round()
                 #roi.update(det)
-                '''for *xyxy, conf, cls in reversed(det):
-                    c = int(cls)
-                    if c == 0:
-                        label = f"{names[c]} {conf:.2f}"
-                        label = f"{names[c]}"
-                        annotator.box_label(xyxy, label, color=colors(c, True))'''
 
                 # Print results
                 for c in det[:, -1].unique():
                     n = (det[:, -1] == c).sum()
                     s += f"{n} {names[int(c)]}{'s' * (n > 1)}, "
+
 
                 # Pass detection to deepsort
                 clss = det[:, 5]
@@ -190,6 +192,21 @@ def run(opt):
                 clss = clss[person_idx]
                 outputs = deepsort_model_list[i].update(xywhs.cpu(), confs.cpu(), clss.cpu(), im0)
                 roi.update(outputs)
+
+                # Face mosaic
+                '''for *xyxy, conf, cls in reversed(det):
+                    c = int(cls)
+                    if c == 1 or c == 2:
+                        label = f"{names[c]} {conf:.2f}"
+                        label = f"{names[c]}"
+                        print(xyxy)
+                        face = im0[int(xyxy[1]): int(xyxy[3]), int(xyxy[0]): int(xyxy[2])]
+                        print(face.shape)
+                        face = cv2.resize(face, dsize=None, fx=0.1, fy=0.1)
+                        face = cv2.resize(face, (int(xyxy[2]) - int(xyxy[0]), int(xyxy[3]) - int(xyxy[1])), interpolation=cv2.INTER_AREA)
+                        print(face.shape)
+                        im0[int(xyxy[1]): int(xyxy[3]), int(xyxy[0]): int(xyxy[2])] = face
+                        #annotator.box_label(xyxy, label, color=colors(c, True))'''
 
                 # Draw visualization
                 cropped_person_batch = []
@@ -205,7 +222,7 @@ def run(opt):
                         label = f"{names[c]}"
                         #annotator.box_label(xyxy, label, color=colors(id, True))
 
-                        '''if yolo_save_crop:
+                        if yolo_save_crop:
                             save_one_box(xyxy, imc, file=save_dir / "crops" / names[c] / f"{p.stem}.jpg", BGR=True)
 
                         # Append bodies and faces
@@ -229,8 +246,8 @@ def run(opt):
 
                             cropped_person_batch.append(transform(person_crop_lb).unsqueeze(0))
                             person_centers.append(center)
-                            person_scales.append(re_scale)'''
-                    '''if cropped_person_batch:
+                            person_scales.append(re_scale)
+                    if cropped_person_batch:
                         cropped_person_batch = torch.cat(cropped_person_batch)
                         kp_preds, kp_confs = get_pose_estimation_prediction_from_batch(hrnet_model,
                                                                                        cropped_person_batch,
@@ -239,7 +256,7 @@ def run(opt):
                                                                                        cfg)
                         for kp_pred, kp_conf in zip(kp_preds, kp_confs):
                             for kpt, kpc in zip(kp_pred, kp_conf):
-                                draw_pose(kpt, im0, kpc, hrnet_vis_thr)'''
+                                draw_keypoints(kpt, im0, kpc, hrnet_vis_thr)
 
             else:
                 deepsort_model_list[i].increment_ages()
@@ -259,6 +276,7 @@ def run(opt):
                 im0 = roi.imshow(im0)
                 cv2.waitKey(1)
 
+
             if opt.save_vid:
                 if dataset.mode == "imagae":
                     cv2.imwrite(save_path, im0)
@@ -275,7 +293,6 @@ def run(opt):
                             fps, w, h = 30, im0.shape[1], im0.shape[0]
                             save_path += ".mp4"
                         vid_writer[i] = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*"mp4v"), fps, (w, h))
-                    print("???")
                     vid_writer[i].write(im0)
 
 def parse_opt():
@@ -306,12 +323,13 @@ def parse_opt():
     parser.add_argument("--hrnet-dataDir", default="")
     parser.add_argument("--hrnet-vis-thr", type=float, default=0.6)
 
-    source = "rtsp://datonai:datonai@172.30.1.49:554/stream1"
+    #source = "rtsp://datonai:datonai@172.30.1.49:554/stream1"
     #source = "source.txt"
     #source = "http://211.254.214.79:4980/vod/2021/07/16/3-9_2_171/index.m3u8"
     #source = "rtmp://211.254.214.79:4988/CH/CH-0001-zzl5qcmgxg"
     #source = "/media/daton/D6A88B27A88B0569/dataset/mot/MOT17/test/MOT17-03-DPM/img1"
-    #source = "/home/daton/Downloads/bandicam 2021-09-24 05-22-34-452.mp4"
+    #source = "/media/daton/D6A88B27A88B0569/dataset/mot/MOT17/train/MOT17-11-DPM/img1"
+    source = "/home/daton/Downloads/bandicam 2021-09-24 05-22-34-452.mp4"
     #source = "/media/daton/D6A88B27A88B0569/dataset/사람동작 영상/이미지/image_action_45/image_45-2/45-2/45-2_001-C02"
     #source = "https://www.youtube.com/watch?v=-gSOi6diYzI"
     #source = "https://www.youtube.com/watch?v=gwavBeK4H1Q"
