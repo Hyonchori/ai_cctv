@@ -100,10 +100,12 @@ def run(opt):
         score_thr=opt.stdet_action_score_thr,
         label_map_path=opt.stdet_label_map_path
     )
+    print(stdet_model.model)
 
     # Run inference
     if device.type != "cpu":
         yolo_model(torch.zeros(1, 3, *yolo_imgsz).to(device).type_as(next(yolo_model.parameters())))
+        stdet_model(torch.zeros(1, ))
     t0 = time.time()
     for path, img, im0s, vid_cap in dataset:
         print("\n---")

@@ -300,7 +300,7 @@ def parse_opt():
     #source = "/media/daton/D6A88B27A88B0569/dataset/사람동작 영상/이미지/image_action_45/image_45-1/45-1/45-1_001-C01"
     #source = "https://www.youtube.com/watch?v=-gSOi6diYzI"
     #source = "https://www.youtube.com/watch?v=gwavBeK4H1Q"
-    #source = "0"
+    source = "1"
     parser.add_argument("--source", type=str, default=source)
     parser.add_argument("--device", default="")
     parser.add_argument("--project", default="runs/detect")

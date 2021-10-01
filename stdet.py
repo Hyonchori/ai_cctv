@@ -51,6 +51,7 @@ class StdetPredictor:
             return task
 
         with torch.no_grad():
+
             result = self.model(**task.get_model_inputs(self.device))[0]
 
         # pack results of human detector and stdet
