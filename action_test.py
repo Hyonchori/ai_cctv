@@ -2,10 +2,11 @@ import argparse
 import sys
 import os
 import time
-import numpy as np
+import collections
 from pathlib import Path
 
 import cv2
+import numpy as np
 import torch
 import torch.backends.cudnn as cudnn
 
@@ -26,6 +27,48 @@ from yolov5.utils.downloads import attempt_download
 
 from stdet import StdetPredictor
 from mmcv import Config as get_stdet_cfg
+import mmcv
+from ava_action_label import action_dict
+
+
+def plot_action_label(img, actions, st, colors, verbose):
+    location = (0 + st[0], 18 + verbose * 18 + st[1])
+    diag0 = (location[0] + 20, location[1] - 14)
+    diag1 = (location[0], location[1] + 2)
+    cv2.rectangle(img, diag0, diag1, colors(verbose + 110, True), -1)
+    if len(actions) > 0:
+        for (label, score) in actions:
+            text = f"{label}: {score:.2f}"
+            textsize = cv2.getTextSize(text, cv2.FONT_HERSHEY_DUPLEX, 0.5, 1)[0]
+            textwidth = textsize[0]
+            diag0 = (location[0] + textwidth, location[1] - 14)
+            cv2.rectangle(img, diag0, diag1, colors(verbose + 110, True), -1)
+            cv2.putText(img, text, location, cv2.FONT_HERSHEY_DUPLEX, 0.5, (255, 255, 255), 1, 1)
+            break
+
+
+def plot_actions(img, bboxes, actions, ratio, colors):
+    for bbox, action in zip(bboxes, actions):
+        bbox = bbox.cpu().numpy() / ratio[0]
+        bbox = bbox.astype(np.int64)
+        st, ed = tuple(bbox[:2]), tuple(bbox[2:])
+
+        action = sorted(action, key=lambda x: x[1], reverse=True)
+        action_type_check = {"PERSON_MOVEMENT": False,
+                             "OBJECT_MANIPULATION": False,
+                             "PERSON_INTERACTION": False}
+        print(action)
+        print(action_dict)
+
+        action_pm = list(filter(lambda x: x[0] in action_dict["PERSON_MOVEMENT"], action))
+        action_om = list(filter(lambda x: x[0] in action_dict["OBJECT_MANIPULATION"], action))
+        action_pi = list(filter(lambda x: x[0] in action_dict["PERSON_INTERACTION"], action))
+        print(action_pm)
+        print(action_om)
+        print(action_pi)
+        plot_action_label(img, action_pm, st, colors, 0)
+        plot_action_label(img, action_om, st, colors, 1)
+        plot_action_label(img, action_pi, st, colors, 2)
 
 
 @torch.no_grad()
@@ -100,13 +143,22 @@ def run(opt):
         score_thr=opt.stdet_action_score_thr,
         label_map_path=opt.stdet_label_map_path
     )
-    print(stdet_model.model)
+
+    tmp_action_input = {
+        "img": [torch.zeros(1, 3, 8, 256, 256).to(device).type_as(next(stdet_model.model.parameters()))],
+        "img_metas": [[{"img_shape": (256, 256)}]],
+        "proposals": [[torch.tensor([[10, 10, 20, 20]], device=device).type_as(next(stdet_model.model.parameters()))]],
+        "return_loss": False
+    }
+    img_norm_cfg = stdet_cfg["img_norm_cfg"]
 
     # Run inference
     if device.type != "cpu":
         yolo_model(torch.zeros(1, 3, *yolo_imgsz).to(device).type_as(next(yolo_model.parameters())))
-        stdet_model(torch.zeros(1, ))
+        stdet_model.model(**tmp_action_input)
+
     t0 = time.time()
+    action_input_imgs = [collections.deque([], maxlen=8) for _ in range(bs)]
     for path, img, im0s, vid_cap in dataset:
         print("\n---")
         img = torch.from_numpy(img).to(device)
@@ -130,6 +182,120 @@ def run(opt):
             else:
                 p, s, im0, frame = path, "", im0s.copy(), getattr(dataset, "frame", 0)
 
+            p = Path(p)
+            save_path = str(save_dir / "video") if "MOT17" in str(p) else str(save_dir / p.name)
+            s += "%gx%g" % img.shape[2:]
+            imc = im0.copy()
+            annotator = Annotator(im0, line_width=2, pil=not ascii)
+
+
+
+            if len(det) > 0:
+                det[:, :4] = scale_coords(img.shape[2:], det[:, :4], im0.shape).round()
+
+                for c in det[:, -1].unique():
+                    n = (det[:, -1] == c).sum()
+                    s += f"{n} {names[int(c)]}{'s' * (n > 1)}, "
+
+                clss = det[:, 5]
+                person_idx = clss == 0
+                xywhs = xyxy2xywh(det[:, 0:4])[person_idx]
+                confs = det[:, 4][person_idx]
+                clss = clss[person_idx]
+                outputs = deepsort_model_list[i].update(xywhs.cpu(), confs.cpu(), clss.cpu(), im0)
+
+                if len(outputs) > 0:
+
+                    stdet_input_size = mmcv.rescale_size((im0.shape[1], im0.shape[0]), (256, np.inf))
+                    if "to_rgb" not in img_norm_cfg and "to_bgr" in img_norm_cfg:
+                        to_bgr = img_norm_cfg.pop("to_bgr")
+                        img_norm_cfg["to_rgb"] = to_bgr
+                    img_norm_cfg["mean"] = np.array(img_norm_cfg["mean"])
+                    img_norm_cfg["std"] = np.array(img_norm_cfg["std"])
+
+                    processed_frame = mmcv.imresize(im0, stdet_input_size).astype(np.float32)
+                    _ = mmcv.imnormalize_(processed_frame, **img_norm_cfg)
+                    action_input_imgs[i].append(processed_frame)
+
+
+                    cv2.imshow("img", action_input_imgs[i][-1])
+
+                    tmp_proposals = []
+                    ratio = (stdet_input_size[0] / im0.shape[1], stdet_input_size[1] / im0.shape[0])
+                    for j, (output, conf) in enumerate(zip(reversed(outputs), reversed(confs))):
+                        xyxy = output[0: 4]
+                        id = int(output[4])
+                        cls = output[5]
+                        c = int(cls)
+                        label = f"{id} {names[c]} {conf:.2f}"
+                        annotator.box_label(xyxy, label, color=colors(id, True))
+
+                        proposal = torch.from_numpy(xyxy * ratio[0]).unsqueeze(0).to(device)
+                        tmp_proposals.append(proposal)
+
+                    if len(tmp_proposals) > 0:
+                        tmp_proposals = [[torch.cat(tmp_proposals).float()]]
+
+                        if len(action_input_imgs[i]) == 8:
+                            imgs = np.stack(action_input_imgs[i]).transpose(3, 0, 1, 2)
+                            imgs = [torch.from_numpy(imgs).unsqueeze(0).to(device)]
+
+
+                            img_meta = [[{"img_shape": processed_frame.shape[:2]}]]
+                            return_loss = False
+
+                            action_input = {
+                                "img": imgs,
+                                "img_metas": img_meta,
+                                "proposals": tmp_proposals,
+                                "return_loss": return_loss
+                            }
+                            result = stdet_model.model(**action_input)[0]
+                            preds = []
+                            for _ in range(tmp_proposals[0][0].shape[0]):
+                                preds.append([])
+                            for class_id in range(len(result)):
+                                if class_id + 1 not in stdet_model.label_map:
+                                    continue
+                                for bbox_id in range(tmp_proposals[0][0].shape[0]):
+                                    if len(result[class_id]) != tmp_proposals[0][0].shape[0]:
+                                        continue
+                                    if result[class_id][bbox_id, 4] > stdet_model.score_thr:
+                                        preds[bbox_id].append((stdet_model.label_map[class_id + 1],
+                                                               result[class_id][bbox_id, 4]))
+                            plot_actions(im0, tmp_proposals[0][0], preds, ratio, colors)
+
+            else:
+                deepsort_model_list[i].increment_ages()
+
+
+            t3 = time_sync()
+            print(f"elapsed time: {t3 - t1:.4f}")
+            #cv2.imshow(str(p), im0)
+            cv2.imshow("img", im0)
+            cv2.waitKey(1)
+
+            if opt.save_vid:
+                if dataset.mode == "imagea":
+                    cv2.imwrite(save_path, im0)
+                else:
+                    if vid_path[i] != save_path:
+                        vid_path[i] = save_path
+                        if isinstance(vid_writer[i], cv2.VideoWriter):
+                            vid_writer[i].release()
+                        if vid_cap:
+                            fps = vid_cap.get(cv2.CAP_PROP_FPS)
+                            w = int(vid_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+                            h = int(vid_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                        else:
+                            fps, w, h = 15, im0.shape[1], im0.shape[0]
+                            save_path += ".mp4"
+                        print(fps, w, h)
+                        vid_writer[i] = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*"mp4v"), fps, (w, h))
+                    vid_writer[i].write(im0)
+
+
+
 
 
 def parse_opt():
@@ -151,7 +317,7 @@ def parse_opt():
     parser.add_argument("--deepsort-cfg", type=str, default="deep_sort_pytorch/configs/deep_sort.yaml")
     parser.add_argument("--deepsort-weights", type=str, default="deep_sort_pytorch/deep_sort/deep/checkpoint/ckpt.t7")
 
-    parser.add_argument("--stdet-cfg", default=("../mmaction2/configs/detection/ava/"
+    parser.add_argument("--stdet-cfg", default=("weights/"
                                                 "slowonly_omnisource_pretrained_r101_8x8x1_20e_ava_rgb.py"))
     parser.add_argument("--stdet-weights", default=('https://download.openmmlab.com/mmaction/detection/ava/'
                                                     'slowonly_omnisource_pretrained_r101_8x8x1_20e_ava_rgb/'
@@ -167,7 +333,8 @@ def parse_opt():
     #source = "/media/daton/D6A88B27A88B0569/dataset/사람동작 영상/이미지/image_action_45/image_45-1/45-1/45-1_001-C01"
     #source = "https://www.youtube.com/watch?v=-gSOi6diYzI"
     #source = "https://www.youtube.com/watch?v=gwavBeK4H1Q"
-    #source = "0"
+    #source = "/home/daton/Downloads/videos/bandicam 2021-09-24 05-22-34-452.mp4"
+    source = "0"
     parser.add_argument("--source", type=str, default=source)
     parser.add_argument("--device", default="")
     parser.add_argument("--project", default="runs/detect")

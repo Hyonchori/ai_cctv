@@ -220,7 +220,8 @@ def run(opt):
                         c = int(cls)
                         label = f"{id} {names[c]} {conf:.2f}"
                         label = f"{names[c]}"
-                        #annotator.box_label(xyxy, label, color=colors(id, True))
+                        print(xyxy, id, cls)
+                        annotator.box_label(xyxy, label, color=colors(id, True))
 
                         if yolo_save_crop:
                             save_one_box(xyxy, imc, file=save_dir / "crops" / names[c] / f"{p.stem}.jpg", BGR=True)
@@ -272,8 +273,8 @@ def run(opt):
             # Stream results
             im0 = annotator.result()
             if opt.show_vid:
-                #cv2.imshow(str(p), im0)
-                im0 = roi.imshow(im0)
+                cv2.imshow(str(p), im0)
+                #im0 = roi.imshow(im0)
                 cv2.waitKey(1)
 
 
@@ -323,13 +324,13 @@ def parse_opt():
     parser.add_argument("--hrnet-dataDir", default="")
     parser.add_argument("--hrnet-vis-thr", type=float, default=0.6)
 
-    #source = "rtsp://datonai:datonai@172.30.1.49:554/stream1"
+    source = "rtsp://datonai:datonai@172.30.1.49:554/stream1"
     #source = "source.txt"
     #source = "http://211.254.214.79:4980/vod/2021/07/16/3-9_2_171/index.m3u8"
     #source = "rtmp://211.254.214.79:4988/CH/CH-0001-zzl5qcmgxg"
     #source = "/media/daton/D6A88B27A88B0569/dataset/mot/MOT17/test/MOT17-03-DPM/img1"
     #source = "/media/daton/D6A88B27A88B0569/dataset/mot/MOT17/train/MOT17-11-DPM/img1"
-    source = "/home/daton/Downloads/bandicam 2021-09-24 05-22-34-452.mp4"
+    #source = "/home/daton/Downloads/bandicam 2021-09-24 05-22-34-452.mp4"
     #source = "/media/daton/D6A88B27A88B0569/dataset/사람동작 영상/이미지/image_action_45/image_45-2/45-2/45-2_001-C02"
     #source = "https://www.youtube.com/watch?v=-gSOi6diYzI"
     #source = "https://www.youtube.com/watch?v=gwavBeK4H1Q"

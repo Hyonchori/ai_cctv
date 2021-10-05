@@ -131,7 +131,7 @@ def run(opt):
         # NMS
         pred = non_max_suppression(pred, yolo_conf_thr, yolo_iou_thr, yolo_target_classes, max_det=yolo_max_det)
         t2 = time_sync()
-
+        print(pred)
         # Process predictions
         for i, det in enumerate(pred):
             if webcam:
@@ -171,7 +171,9 @@ def run(opt):
                 xywhs = xyxy2xywh(det[:, 0:4])[person_idx]
                 confs = det[:, 4][person_idx]
                 clss = clss[person_idx]
-                #outputs = deepsort_model_list[i].update(xywhs.cpu(), confs.cpu(), clss.cpu(), im0)
+                outputs = deepsort_model_list[i].update(xywhs.cpu(), confs.cpu(), clss.cpu(), im0)
+
+                print(outputs)
 
 
                 # Draw visualization
@@ -179,7 +181,7 @@ def run(opt):
                 person_heights = []
                 person_centers = []
                 person_scales = []
-                '''if len(outputs) > 0:
+                if len(outputs) > 0:
                     for j, (output, conf) in enumerate(zip(reversed(outputs), reversed(confs))):
                         xyxy = output[0: 4]
                         id = int(output[4])
@@ -196,10 +198,10 @@ def run(opt):
                         if c == 0:
                             bodies.append([*xyxy, conf])
                         elif c >= 1:
-                            faces.append([*xyxy, conf])'''
+                            faces.append([*xyxy, conf])
 
                         # Keypoint estimation
-                '''
+
                         if c == 0:
                             box = [(xyxy[0].item(), xyxy[1].item()), (xyxy[2].item(), xyxy[3].item())]
                             person_crop = img_pose[int(box[0][1]): int(box[1][1]),
@@ -228,7 +230,7 @@ def run(opt):
                             draw_keypoints(kpt, im0, kpc, hrnet_vis_thr)
 
                             kpin_simple = np.hstack((kpt, kpc))
-                            kpin_simple = torch.from_numpy(kpin_simple).view(1, -1).to(device)'''
+                            kpin_simple = torch.from_numpy(kpin_simple).view(1, -1).to(device)
 
 
             # Tracking
@@ -300,7 +302,7 @@ def parse_opt():
     #source = "/media/daton/D6A88B27A88B0569/dataset/사람동작 영상/이미지/image_action_45/image_45-1/45-1/45-1_001-C01"
     #source = "https://www.youtube.com/watch?v=-gSOi6diYzI"
     #source = "https://www.youtube.com/watch?v=gwavBeK4H1Q"
-    source = "1"
+    #source = "0"
     parser.add_argument("--source", type=str, default=source)
     parser.add_argument("--device", default="")
     parser.add_argument("--project", default="runs/detect")
