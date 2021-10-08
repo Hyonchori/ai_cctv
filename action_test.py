@@ -4,6 +4,8 @@ import os
 import time
 import collections
 from pathlib import Path
+import warnings
+warnings.filterwarnings("ignore")
 
 import cv2
 import numpy as np
@@ -52,20 +54,10 @@ def plot_actions(img, bboxes, actions, ratio, colors):
         bbox = bbox.cpu().numpy() / ratio[0]
         bbox = bbox.astype(np.int64)
         st, ed = tuple(bbox[:2]), tuple(bbox[2:])
-
         action = sorted(action, key=lambda x: x[1], reverse=True)
-        action_type_check = {"PERSON_MOVEMENT": False,
-                             "OBJECT_MANIPULATION": False,
-                             "PERSON_INTERACTION": False}
-        print(action)
-        print(action_dict)
-
         action_pm = list(filter(lambda x: x[0] in action_dict["PERSON_MOVEMENT"], action))
         action_om = list(filter(lambda x: x[0] in action_dict["OBJECT_MANIPULATION"], action))
         action_pi = list(filter(lambda x: x[0] in action_dict["PERSON_INTERACTION"], action))
-        print(action_pm)
-        print(action_om)
-        print(action_pi)
         plot_action_label(img, action_pm, st, colors, 0)
         plot_action_label(img, action_om, st, colors, 1)
         plot_action_label(img, action_pi, st, colors, 2)
@@ -301,7 +293,7 @@ def run(opt):
 def parse_opt():
     parser = argparse.ArgumentParser()
 
-    yolo_weights = "weights/yolov5l_crowdhuman_v2.pt"
+    yolo_weights = "weights/yolov5/yolov5l_crowdhuman_v2.pt"
     #yolo_weights = "yolov5x.pt"
     parser.add_argument("--yolo_weights", nargs="+", type=str, default=yolo_weights)
     parser.add_argument("--yolo-imgsz", "--yolo-img", "--iyolo-mg-size", type=int, default=[640])
@@ -315,14 +307,12 @@ def parse_opt():
     parser.add_argument("--yolo-save-crop", default=False, action="store_true")
 
     parser.add_argument("--deepsort-cfg", type=str, default="deep_sort_pytorch/configs/deep_sort.yaml")
-    parser.add_argument("--deepsort-weights", type=str, default="deep_sort_pytorch/deep_sort/deep/checkpoint/ckpt.t7")
+    parser.add_argument("--deepsort-weights", type=str, default="weights/deep_sort/ckpt.t7")
 
-    parser.add_argument("--stdet-cfg", default=("weights/"
-                                                "slowonly_omnisource_pretrained_r101_8x8x1_20e_ava_rgb.py"))
-    parser.add_argument("--stdet-weights", default=('https://download.openmmlab.com/mmaction/detection/ava/'
-                                                    'slowonly_omnisource_pretrained_r101_8x8x1_20e_ava_rgb/'
-                                                    'slowonly_omnisource_pretrained_r101_8x8x1_20e_ava_rgb'
-                                                    '_20201217-16378594.pth'))
+    stdet_cfg = "mmaction2/configs/detection/ava/slowfast_kinetics_pretrained_r50_8x8x1_cosine_10e_ava22_rgb.py"
+    stdet_weights = "weights/stdet/slowfast_kinetics_pretrained_r50_8x8x1_cosine_10e_ava22_rgb-b987b516.pth"
+    parser.add_argument("--stdet-cfg", default=stdet_cfg)
+    parser.add_argument("--stdet-weights", default=stdet_weights)
     parser.add_argument("--stdet-action-score-thr", type=float, default=0.4)
     parser.add_argument("--stdet-label-map-path", default="../mmaction2/tools/data/ava/label_map.txt")
     parser.add_argument("--stdet-cfg-options", default={})
@@ -334,7 +324,7 @@ def parse_opt():
     #source = "https://www.youtube.com/watch?v=-gSOi6diYzI"
     #source = "https://www.youtube.com/watch?v=gwavBeK4H1Q"
     #source = "/home/daton/Downloads/videos/bandicam 2021-09-24 05-22-34-452.mp4"
-    source = "0"
+    #source = "0"
     parser.add_argument("--source", type=str, default=source)
     parser.add_argument("--device", default="")
     parser.add_argument("--project", default="runs/detect")
