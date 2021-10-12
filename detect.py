@@ -267,7 +267,7 @@ def run(opt):
 def parse_opt():
     parser = argparse.ArgumentParser()
 
-    yolo_weights = "weights/yolov5l_crowdhuman_v2.pt"
+    yolo_weights = "weights/yolov5l_crowdhuman_v3.pt"
     #yolo_weights = "yolov5x.pt"
     parser.add_argument("--yolo_weights", nargs="+", type=str, default=yolo_weights)
     parser.add_argument("--yolo-imgsz", "--yolo-img", "--iyolo-mg-size", type=int, default=[640])

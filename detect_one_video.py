@@ -194,7 +194,7 @@ def run(opt):
                 roi.update(outputs)
 
                 # Face mosaic
-                '''for *xyxy, conf, cls in reversed(det):
+                for *xyxy, conf, cls in reversed(det):
                     c = int(cls)
                     if c == 1 or c == 2:
                         label = f"{names[c]} {conf:.2f}"
@@ -205,8 +205,8 @@ def run(opt):
                         face = cv2.resize(face, dsize=None, fx=0.1, fy=0.1)
                         face = cv2.resize(face, (int(xyxy[2]) - int(xyxy[0]), int(xyxy[3]) - int(xyxy[1])), interpolation=cv2.INTER_AREA)
                         print(face.shape)
-                        im0[int(xyxy[1]): int(xyxy[3]), int(xyxy[0]): int(xyxy[2])] = face
-                        #annotator.box_label(xyxy, label, color=colors(c, True))'''
+                        #im0[int(xyxy[1]): int(xyxy[3]), int(xyxy[0]): int(xyxy[2])] = face
+                        annotator.box_label(xyxy, label, color=colors(c, True))
 
                 # Draw visualization
                 cropped_person_batch = []
@@ -299,7 +299,7 @@ def run(opt):
 def parse_opt():
     parser = argparse.ArgumentParser()
 
-    yolo_weights = "weights/yolov5l_crowdhuman_v2.pt"
+    yolo_weights = "weights/yolov5/yolov5l_crowdhuman_v3.pt"
     #yolo_weights = "yolov5x.pt"
     parser.add_argument("--yolo_weights", nargs="+", type=str, default=yolo_weights)
     parser.add_argument("--yolo-imgsz", "--yolo-img", "--iyolo-mg-size", type=int, default=[640])
@@ -313,7 +313,7 @@ def parse_opt():
     parser.add_argument("--yolo-save-crop", default=False, action="store_true")
 
     parser.add_argument("--deepsort-cfg", type=str, default="deep_sort_pytorch/configs/deep_sort.yaml")
-    parser.add_argument("--deepsort-weights", type=str, default="deep_sort_pytorch/deep_sort/deep/checkpoint/ckpt.t7")
+    parser.add_argument("--deepsort-weights", type=str, default="weights/deep_sort/deep/checkpoint/ckpt.t7")
 
     hrnet_cfg = "inference-config.yaml"
     #hrnet_cfg = "hrnet_config.yaml"
@@ -330,7 +330,7 @@ def parse_opt():
     #source = "rtmp://211.254.214.79:4988/CH/CH-0001-zzl5qcmgxg"
     #source = "/media/daton/D6A88B27A88B0569/dataset/mot/MOT17/test/MOT17-03-DPM/img1"
     #source = "/media/daton/D6A88B27A88B0569/dataset/mot/MOT17/train/MOT17-11-DPM/img1"
-    #source = "/home/daton/Downloads/bandicam 2021-09-24 05-22-34-452.mp4"
+    source = "/home/daton/Downloads/videos/bandicam 2021-09-24 05-22-34-452.mp4"
     #source = "/media/daton/D6A88B27A88B0569/dataset/사람동작 영상/이미지/image_action_45/image_45-2/45-2/45-2_001-C02"
     #source = "https://www.youtube.com/watch?v=-gSOi6diYzI"
     #source = "https://www.youtube.com/watch?v=gwavBeK4H1Q"
