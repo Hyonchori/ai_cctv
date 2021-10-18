@@ -206,7 +206,7 @@ def run(opt):
                         face = cv2.resize(face, (int(xyxy[2]) - int(xyxy[0]), int(xyxy[3]) - int(xyxy[1])), interpolation=cv2.INTER_AREA)
                         print(face.shape)
                         #im0[int(xyxy[1]): int(xyxy[3]), int(xyxy[0]): int(xyxy[2])] = face
-                        annotator.box_label(xyxy, label, color=colors(c, True))
+                        #annotator.box_label(xyxy, label, color=colors(c, True))
 
                 # Draw visualization
                 cropped_person_batch = []
@@ -279,7 +279,7 @@ def run(opt):
 
 
             if opt.save_vid:
-                if dataset.mode == "imagae":
+                if dataset.mode == "image":
                     cv2.imwrite(save_path, im0)
                 else:
                     if vid_path[i] != save_path:
@@ -300,6 +300,7 @@ def parse_opt():
     parser = argparse.ArgumentParser()
 
     yolo_weights = "weights/yolov5/yolov5l_crowdhuman_v3.pt"
+    #yolo_weights = "weights/yolov5/yolov5l_crowdhuman_military_finetune.pt"
     #yolo_weights = "yolov5x.pt"
     parser.add_argument("--yolo_weights", nargs="+", type=str, default=yolo_weights)
     parser.add_argument("--yolo-imgsz", "--yolo-img", "--iyolo-mg-size", type=int, default=[640])
@@ -334,7 +335,9 @@ def parse_opt():
     #source = "/media/daton/D6A88B27A88B0569/dataset/사람동작 영상/이미지/image_action_45/image_45-2/45-2/45-2_001-C02"
     #source = "https://www.youtube.com/watch?v=-gSOi6diYzI"
     #source = "https://www.youtube.com/watch?v=gwavBeK4H1Q"
-    #source = "0"
+    #source = "https://www.youtube.com/watch?v=jyKoMtcLepg"
+    source = "/media/daton/D6A88B27A88B0569/dataset/military/solider"
+    source = "0"
     parser.add_argument("--source", type=str, default=source)
     parser.add_argument("--device", default="")
     parser.add_argument("--project", default="runs/detect_one_video")

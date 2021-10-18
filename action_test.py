@@ -30,7 +30,7 @@ from yolov5.utils.downloads import attempt_download
 from stdet import StdetPredictor
 from mmcv import Config as get_stdet_cfg
 import mmcv
-from ava_action_label import action_dict
+from custom_dataset.ava_action_label import action_dict
 
 
 def plot_action_label(img, actions, st, colors, verbose):
@@ -319,12 +319,14 @@ def parse_opt():
 
     source = "rtsp://datonai:datonai@172.30.1.49:554/stream1"
     #source = "source.txt"
+    source = "/media/daton/D6A88B27A88B0569/dataset/mot/MOT17/train/MOT17-02-DPM/img1"
     #source = "/media/daton/D6A88B27A88B0569/dataset/mot/MOT17/test/MOT17-03-DPM/img1"
     #source = "/media/daton/D6A88B27A88B0569/dataset/사람동작 영상/이미지/image_action_45/image_45-1/45-1/45-1_001-C01"
     #source = "https://www.youtube.com/watch?v=-gSOi6diYzI"
     #source = "https://www.youtube.com/watch?v=gwavBeK4H1Q"
     #source = "/home/daton/Downloads/videos/bandicam 2021-09-24 05-22-34-452.mp4"
-    #source = "0"
+    source = "https://www.youtube.com/watch?v=rnGlZYcn0Z4"
+    source = "0"
     parser.add_argument("--source", type=str, default=source)
     parser.add_argument("--device", default="")
     parser.add_argument("--project", default="runs/detect")
