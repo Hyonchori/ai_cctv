@@ -316,8 +316,7 @@ def parse_opt():
     parser.add_argument("--deepsort-cfg", type=str, default="deep_sort_pytorch/configs/deep_sort.yaml")
     parser.add_argument("--deepsort-weights", type=str, default="weights/deep_sort/deep/checkpoint/ckpt.t7")
 
-    hrnet_cfg = "inference-config.yaml"
-    #hrnet_cfg = "hrnet_config.yaml"
+    hrnet_cfg = "weights/hrnet/hrnet-config.yaml"
     parser.add_argument("--hrnet-cfg", type=str, default=hrnet_cfg)
     parser.add_argument("--hrnet-opts", default=[])
     parser.add_argument("--hrnet-modelDir", default="")

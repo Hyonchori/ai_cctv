@@ -222,6 +222,8 @@ def run(opt):
                         label = f"{id} {names[c]} {conf:.2f}"
                         annotator.box_label(xyxy, label, color=colors(id, True))
 
+                        print(xyxy)
+                        print(type(xyxy))
                         proposal = torch.from_numpy(xyxy * ratio[0]).unsqueeze(0).to(device)
                         tmp_proposals.append(proposal)
 
