@@ -10,6 +10,7 @@ warnings.filterwarnings("ignore")
 import cv2
 import numpy as np
 import torch
+from torchvision import transforms
 import torch.backends.cudnn as cudnn
 
 FILE = Path(__file__).absolute()
@@ -37,6 +38,8 @@ from stdet import StdetPredictor
 from mmcv import Config as get_stdet_cfg
 import mmcv
 from custom_dataset.ava_action_label import action_dict
+
+from efficientnet.model import EfficientClassifier
 
 
 def plot_action_label(img, actions, st, colors, verbose):
@@ -152,6 +155,13 @@ def run(opt):
 
     # Load Classifier
     clf_model = torch.load(clf_model_pt)
+    clf_model = EfficientClassifier(num_classes=2).cuda().eval()
+    clf_model.load_state_dict(torch.load(clf_model_pt))
+    clf_pp = transforms.Compose([
+        #transforms.Resize(128),
+        #transforms.ToTensor(),
+        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+    ])
 
     # DataLoader
     webcam = source.isnumeric() or source.endswith(".txt") or source.lower().startswith(
@@ -274,7 +284,8 @@ def run(opt):
                             clf_input_img, _, _ = letterbox(clf_input_img, clf_imgsz, auto=False)
                             clf_input = torch.from_numpy(clf_input_img.transpose(2, 0, 1)).unsqueeze(0).to(device).float()
                             clf_input /= 255.
-                            clf_pred = clf_model(clf_input)[0]
+                            clf_pred = clf_model(clf_input)
+                            print(clf_pred)
                             clf_idx = torch.argmax(clf_pred, dim=1)[0]
                             clf_val = torch.max(clf_pred, dim=1)[0]
                             if clf_val >= clf_thr:
@@ -383,7 +394,7 @@ def parse_opt():
     parser.add_argument("--stdet-label-map-path", default="../mmaction2/tools/data/ava/label_map.txt")
     parser.add_argument("--stdet-cfg-options", default={})
 
-    clf_model_pt = "weights/classifier/military_civil_clf_v1.pt"
+    clf_model_pt = "weights/classifier/military_civil_clf4.pt"
     parser.add_argument("--clf-model_pt", type=str, default=clf_model_pt)
     parser.add_argument("--clf-imgsz", type=int, default=[128])
     parser.add_argument("--clf-label-map-path", default="weights/classifier/military_civil_label_map.txt")
@@ -391,7 +402,7 @@ def parse_opt():
 
     source = "rtsp://datonai:datonai@172.30.1.49:554/stream1"
     source = "https://www.youtube.com/watch?v=koGGT2xByoQ"
-    source = "/media/daton/D6A88B27A88B0569/dataset/mot/MOT17/train/MOT17-02-DPM/img1"
+    #source = "/media/daton/D6A88B27A88B0569/dataset/mot/MOT17/train/MOT17-02-DPM/img1"
     #source = "0"
     parser.add_argument("--source", type=str, default=source)
     parser.add_argument("--device", default="")
@@ -402,7 +413,7 @@ def parse_opt():
     show_vid = [1, 1, 1, 1, 1]  # idx 0=yolo, 1=deepsort, 2=classifier, 3=hrnet, 4=stdet
     parser.add_argument("--show-vid", type=list, default=show_vid)
     parser.add_argument("--face_mosaic", type=bool, default=True)
-    model_usage = [1, 1, 1, 1, 1]  # idx 0=yolo, 1=deepsort, 2=classifier, 3=hrnet, 4=stdet
+    model_usage = [1, 1, 1, 0, 0]  # idx 0=yolo, 1=deepsort, 2=classifier, 3=hrnet, 4=stdet
     parser.add_argument("--model-usage", type=list, default=model_usage)
 
     opt = parser.parse_args()
