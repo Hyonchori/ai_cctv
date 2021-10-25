@@ -1,0 +1,14 @@
+pip3 install torch==1.9.1+cu111 torchvision==0.10.1+cu111 torchaudio==0.9.1 -f https://download.pytorch.org/whl/cu111/torch_stable.html
+pip install opencv-contrib-python
+pip install pandas
+pip install requests
+pip install pyyaml
+pip install tqdm
+pip install matplotlib
+pip install seaborn
+pip install easydict
+pip install yacs
+
+pip install git+https://github.com/open-mmlab/mim.git
+mim install mmaction2
+mim install mmdet

@@ -221,7 +221,7 @@ def run(opt):
                         xyxy = box[:4]
                         if box[-1] == 1 or box[-1] == 2:
                             face = im0[int(xyxy[1]): int(xyxy[3]), int(xyxy[0]): int(xyxy[2])]
-                            face = cv2.resize(face, dsize=None, fx=0.1, fy=0.1)
+                            face = cv2.resize(face, dsize=(10, 10))
                             face = cv2.resize(face, (int(xyxy[2]) - int(xyxy[0]), int(xyxy[3]) - int(xyxy[1])),
                                               interpolation=cv2.INTER_AREA)
                             im0[int(xyxy[1]): int(xyxy[3]), int(xyxy[0]): int(xyxy[2])] = face
@@ -267,7 +267,10 @@ def run(opt):
                         label = f"{names[cls]}"
 
                         if model_usage[2]:
-                            clf_input_img = im0s[i].copy()[int(xyxy[1]): int(xyxy[3]), int(xyxy[0]): int(xyxy[2])]
+                            tmp = im0s[i].copy() if webcam else im0s.copy()
+                            clf_input_img = tmp[int(xyxy[1]): int(xyxy[3]), int(xyxy[0]): int(xyxy[2])]
+                            if 0 in clf_input_img.shape:
+                                continue
                             clf_input_img, _, _ = letterbox(clf_input_img, clf_imgsz, auto=False)
                             clf_input = torch.from_numpy(clf_input_img.transpose(2, 0, 1)).unsqueeze(0).to(device).float()
                             clf_input /= 255.
@@ -387,14 +390,16 @@ def parse_opt():
     parser.add_argument("--clf-thr", type=float, default=0.6)
 
     source = "rtsp://datonai:datonai@172.30.1.49:554/stream1"
-    source = "0"
+    source = "https://www.youtube.com/watch?v=koGGT2xByoQ"
+    source = "/media/daton/D6A88B27A88B0569/dataset/mot/MOT17/train/MOT17-02-DPM/img1"
+    #source = "0"
     parser.add_argument("--source", type=str, default=source)
     parser.add_argument("--device", default="")
     parser.add_argument("--dir_path", default="runs/inference")
     parser.add_argument("--run_name", default="exp")
-    parser.add_argument("--is_video_frames", type=bool, default=False)
+    parser.add_argument("--is_video_frames", type=bool, default=True)
     parser.add_argument("--save-vid", type=bool, default=True)
-    show_vid = [1, 1, 1, 1, 0]  # idx 0=yolo, 1=deepsort, 2=classifier, 3=hrnet, 4=stdet
+    show_vid = [1, 1, 1, 1, 1]  # idx 0=yolo, 1=deepsort, 2=classifier, 3=hrnet, 4=stdet
     parser.add_argument("--show-vid", type=list, default=show_vid)
     parser.add_argument("--face_mosaic", type=bool, default=True)
     model_usage = [1, 1, 1, 1, 1]  # idx 0=yolo, 1=deepsort, 2=classifier, 3=hrnet, 4=stdet

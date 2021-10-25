@@ -1,0 +1,37 @@
+
+channel_multiple: 1.0
+
+expected_input_shape:
+  - [192, 52, 52]
+  - [384, 26, 26]
+  - [768, 13, 13]
+
+architecture:
+  # [module, args]
+  [
+    [PWConv, [768, 384]],
+    [Upsample, [None, 2, "nearest", -1]],
+    [ConcatLayer, [1, [-1, -4]]],
+    [BottleneckCSP, [768, 768, 2, 0.5, False, False]],
+    [LSDropBlock, [5, 30]],
+
+    [Bottleneck, [768, 192]],
+    [Upsample, [None, 2, "nearest", -1]],
+    [ConcatLayer, [1, [-1, -10]]],
+    [BottleneckCSP, [384, 384, 2, 0.5, False, False]],
+    [LSDropBlock, [5, 30]],
+
+    [Bottleneck, [384, 192, 3, 2]],
+    [ConcatLayer, [1, [-1, -8]]],
+    [BottleneckCSP, [960, 512, 3, 0.5, False, False]],
+    [LSDropBlock, [5, 30]],
+
+    [Bottleneck, [512, 384, 3, 2]],
+    [ConcatLayer, [1, [-1, -15]]],
+    [BottleneckCSP, [768, 768, 3, 0.5, False, False]],
+    [LSDropBlock, [5, 30]]
+  ]
+
+output_layers:
+  # input layer_idx
+  [-1, -6, -9]
