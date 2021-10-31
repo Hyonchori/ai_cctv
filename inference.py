@@ -37,7 +37,7 @@ from hrnet.custom_lib.hrnet_utils.inference_utils import draw_pose, box_to_cente
 from stdet import StdetPredictor
 from mmcv import Config as get_stdet_cfg
 import mmcv
-from custom_dataset.ava_action_label import action_dict
+from custom_dataset.ava_action_label import get_action_dict
 
 from efficientnet.model import EfficientClassifier
 
@@ -58,7 +58,7 @@ def plot_action_label(img, actions, st, colors, verbose):
             break
 
 
-def plot_actions(img, bboxes, actions, ratio, colors):
+def plot_actions(img, bboxes, actions, ratio, colors, action_dict):
     for bbox, action in zip(bboxes, actions):
         bbox = bbox.cpu().numpy() / ratio[0]
         bbox = bbox.astype(np.int64)
@@ -99,6 +99,8 @@ def run(opt):
     stdet_action_score_thr = opt.stdet_action_score_thr
     stdet_label_map_path = opt.stdet_label_map_path
     stdet_img_norm_cfg = stdet_cfg["img_norm_cfg"]
+    stdet_action_list_path = opt.stdet_action_list_path
+    stdet_action_dict = get_action_dict(stdet_action_list_path)
 
     # Load configs of classifier
     clf_model_pt = opt.clf_model_pt
@@ -117,6 +119,7 @@ def run(opt):
     model_usage = opt.model_usage
     show_vid = list(np.array(model_usage) & np.array(opt.show_vid))
     face_mosaic = opt.face_mosaic
+    show_cls = opt.show_cls
 
     # Directories result will be saved
     save_dir = increment_path(Path(dir_path) / run_name, exist_ok=False)
@@ -277,6 +280,8 @@ def run(opt):
                         label = f"{names[cls]}"
 
                         if model_usage[2]:
+                            if cls != 0:
+                                continue
                             tmp = im0s[i].copy() if webcam else im0s.copy()
                             clf_input_img = tmp[int(xyxy[1]): int(xyxy[3]), int(xyxy[0]): int(xyxy[2])]
                             if 0 in clf_input_img.shape:
@@ -288,11 +293,30 @@ def run(opt):
                             print(clf_pred)
                             clf_idx = torch.argmax(clf_pred, dim=1)[0]
                             clf_val = torch.max(clf_pred, dim=1)[0]
-                            if clf_val >= clf_thr:
-                                label = f"{clf_label_map[clf_idx]}"
+                            if clf_idx == 0:
+                                if clf_val >= clf_thr + 0.3 and show_vid[2]:
+                                    label = f"{clf_label_map[clf_idx]} {clf_val.item():.2f}"
+                                    label = f"{clf_label_map[clf_idx]}"
+                            elif clf_idx == 1:
+                                if clf_val >= clf_thr and show_vid[2]:
+                                    label = f"{clf_label_map[clf_idx]} {clf_val.item():.2f}"
+                                    label = f"{clf_label_map[clf_idx]}"
 
-                        if box_show:
-                            id = int(output[4]) if show_vid[1] else int(output[-1])
+                        if box_show and cls == show_cls:
+                            if not model_usage[2]:
+                                id = int(output[4]) if show_vid[1] else int(output[-1])
+                            else:
+                                if clf_val >= clf_thr:
+                                    id = clf_idx
+                                else:
+                                    id = int(output[4]) if show_vid[1] else int(output[-1])
+
+                            if label == "person":
+                                id = 0
+                            elif label == "civil":
+                                id = 1
+                            elif label == "military":
+                                id = 2
                             annotator.box_label(xyxy, label, color=colors(id, True))
 
                         if model_usage[4] and cls == 0:
@@ -333,7 +357,7 @@ def run(opt):
                                         stdet_result[bbox_id].append((stdet_model.label_map[class_id + 1],
                                                                       stdet_pred[class_id][bbox_id, 4]))
                             if show_vid[4]:
-                                plot_actions(im0, tmp_proposals[0][0], stdet_result, ratio, colors)
+                                plot_actions(im0, tmp_proposals[0][0], stdet_result, ratio, colors, stdet_action_dict)
             else:
                 if model_usage[1]:
                     deepsort_model_list[i].increment_ages()
@@ -357,7 +381,7 @@ def run(opt):
                             w = int(vid_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
                             h = int(vid_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
                         else:
-                            fps, w, h = 15, im0.shape[1], im0.shape[0]
+                            fps, w, h = 30, im0.shape[1], im0.shape[0]
                             save_path += ".mp4"
                         vid_writer[i] = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*"mp4v"), fps, (w, h))
                     vid_writer[i].write(im0)
@@ -391,17 +415,21 @@ def parse_opt():
     parser.add_argument("--stdet-cfg", default=stdet_cfg)
     parser.add_argument("--stdet-weights", default=stdet_weights)
     parser.add_argument("--stdet-action-score-thr", type=float, default=0.4)
+    parser.add_argument("--stdet-action-list-path", default="weights/stdet/ava_action_list_v2.2.pbtxt")
     parser.add_argument("--stdet-label-map-path", default="../mmaction2/tools/data/ava/label_map.txt")
     parser.add_argument("--stdet-cfg-options", default={})
 
-    clf_model_pt = "weights/classifier/military_civil_clf4.pt"
+    clf_model_pt = "weights/classifier/military_civil_clf12.pt"
     parser.add_argument("--clf-model_pt", type=str, default=clf_model_pt)
     parser.add_argument("--clf-imgsz", type=int, default=[128])
     parser.add_argument("--clf-label-map-path", default="weights/classifier/military_civil_label_map.txt")
     parser.add_argument("--clf-thr", type=float, default=0.6)
 
     source = "rtsp://datonai:datonai@172.30.1.49:554/stream1"
-    source = "https://www.youtube.com/watch?v=koGGT2xByoQ"
+    #source = "https://www.youtube.com/watch?v=koGGT2xByoQ"
+    source = "https://www.youtube.com/watch?v=LU8oUZakSKQ"
+    source = "https://www.youtube.com/watch?v=AIWJL43RmSM"
+    source = "https://www.youtube.com/watch?v=NFg8j5HSZ6c"
     #source = "/media/daton/D6A88B27A88B0569/dataset/mot/MOT17/train/MOT17-02-DPM/img1"
     #source = "0"
     parser.add_argument("--source", type=str, default=source)
@@ -410,11 +438,12 @@ def parse_opt():
     parser.add_argument("--run_name", default="exp")
     parser.add_argument("--is_video_frames", type=bool, default=True)
     parser.add_argument("--save-vid", type=bool, default=True)
-    show_vid = [1, 1, 1, 1, 1]  # idx 0=yolo, 1=deepsort, 2=classifier, 3=hrnet, 4=stdet
+    show_vid = [1, 0, 1, 1, 1]  # idx 0=yolo, 1=deepsort, 2=classifier, 3=hrnet, 4=stdet
     parser.add_argument("--show-vid", type=list, default=show_vid)
     parser.add_argument("--face_mosaic", type=bool, default=True)
-    model_usage = [1, 1, 1, 0, 0]  # idx 0=yolo, 1=deepsort, 2=classifier, 3=hrnet, 4=stdet
+    model_usage = [1, 0, 1, 0, 0]  # idx 0=yolo, 1=deepsort, 2=classifier, 3=hrnet, 4=stdet
     parser.add_argument("--model-usage", type=list, default=model_usage)
+    parser.add_argument("--show_cls", type=int, default=0)
 
     opt = parser.parse_args()
     opt.yolo_imgsz *= 2 if len(opt.yolo_imgsz) == 1 else 1  # expand

@@ -8,16 +8,17 @@ transform = transforms.Compose([
     transforms.Resize(128)
 ])
 
-in_root = "/media/daton/D6A88B27A88B0569/dataset/crowdhuman_military"
+in_root = "/media/daton/D6A88B27A88B0569/dataset/crowdhuman"
 out_root = "/media/daton/D6A88B27A88B0569/dataset/military_civil2"
 box_dirs = [os.path.join(in_root, "labels", trainval) for trainval in ["train", "valid"]]
+print(box_dirs)
 box_paths = {}
 for dir in box_dirs:
     for file in os.listdir(dir):
         box_paths[file] = os.path.join(dir, file)
 
 #target_dir = os.path.join(in_root, "images_only_military")
-target_dir = os.path.join(in_root, "images_only_civil")
+target_dir = os.path.join(in_root, "images", "train")
 target_names = os.listdir(target_dir)
 for i, file in enumerate(tqdm(target_names)):
     img_path = os.path.join(target_dir, file)
@@ -48,7 +49,7 @@ for i, file in enumerate(tqdm(target_names)):
             continue
 
         #out_path = os.path.join(out_root, "military", f"{i}-{j}.jpg")
-        out_path = os.path.join(out_root, "civil", f"{i}-{j}.jpg")
+        out_path = os.path.join(out_root, "train", "civil", f"{i}-{j}.jpg")
         cv2.imwrite(out_path, box_img)
 
 

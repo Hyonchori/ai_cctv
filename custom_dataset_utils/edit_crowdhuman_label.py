@@ -3,7 +3,7 @@ from pprint import pprint
 from tqdm import tqdm
 
 label_dir =  "/media/daton/D6A88B27A88B0569/dataset/crowdhuman/labels_front_unsure_abnormal/train"
-out_dir = "/media/daton/D6A88B27A88B0569/dataset/crowdhuman/labels/test"
+out_dir = "/media/daton/D6A88B27A88B0569/dataset/crowdhuman/labels/train"
 
 labels = sorted(os.listdir(label_dir))
 abnormal_num = 0
@@ -39,6 +39,5 @@ for l in tqdm(labels):
             of.write(txt)
 
         if len(data) != len(box_dict):
-            print(l)
-            break
-
+            #print(l)
+            pass

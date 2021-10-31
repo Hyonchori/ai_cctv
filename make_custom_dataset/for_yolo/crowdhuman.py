@@ -1,0 +1,144 @@
+import os
+import sys
+
+import cv2
+import numpy as np
+from tqdm import tqdm
+from insightface.app import FaceAnalysis
+
+app = FaceAnalysis()
+app.prepare(ctx_id=0, det_size=(640, 480))
+
+
+def make_labels(annot_root, img_root, make_root, vis=False, save=False):
+    with open(annot_root) as f:
+        data = f.readlines()
+        for d in tqdm(data):
+            d_dict = eval(d)
+            make_path = os.path.join(make_root, d_dict["ID"] + ".txt")
+            img_path = os.path.join(img_root, d_dict["ID"] + ".jpg")
+            img = cv2.imread(img_path)
+            imgc = img.copy()
+            h, w, _ = img.shape
+
+            txt = ""
+            gtboxes = d_dict["gtboxes"]
+            gtboxes = [x for x in gtboxes if x["tag"] == "person"]
+            for gtbox in gtboxes:
+                use_head = 1
+                if "head_attr" in gtbox.keys():
+                    if "ignore" in gtbox["head_attr"].keys():
+                        if gtbox["head_attr"]["ignore"] == 1:
+                            use_head = 2
+                            continue
+
+                if "ignore" in gtbox["extra"].keys():
+                    if gtbox["extra"]["ignore"] == 1:
+                        use_head = 3
+                        continue
+
+                fbox = gtbox["fbox"]  # full body including occlusion
+                vbox = gtbox["vbox"]  # visible body in image
+                hbox = gtbox["hbox"]  # head in image
+
+                fxyxy_e = get_xyxy_e(fbox, w, h)
+                hxyxy_e = get_xyxy_e(hbox, w, h)
+
+                body_txt = ""
+                if check_xyxy(fxyxy_e):
+                    draw_xyxy(fxyxy_e, img, (225, 0, 0))
+                    body_cpwh = xyxy2cpwhn(fxyxy_e, w, h)
+                    body_txt = f"0 {body_cpwh[0]} {body_cpwh[1]} {body_cpwh[2]} {body_cpwh[3]}\n"
+
+                head_txt = ""
+                if check_xyxy(hxyxy_e):
+                    head_cpwh = xyxy2cpwhn(hxyxy_e, w, h)
+                    head_img = imgc[hxyxy_e[1]: hxyxy_e[3], hxyxy_e[0]: hxyxy_e[2]]
+                    face = app.get(head_img)
+                    if len(face) >= 1:
+                        head_idx = 2
+                    else:
+                        head_idx = 1
+                    head_txt = f"{head_idx} {head_cpwh[0]} {head_cpwh[1]} {head_cpwh[2]} {head_cpwh[3]}\n"
+                    if use_head == 1:
+                        if vis: draw_xyxy(hxyxy_e, img, (0, 0, 225))
+                    elif use_head == 2:
+                        print("")
+                        print(f"use_head: 2 => {gtbox}")
+                        if vis: draw_xyxy(hxyxy_e, img, (0, 225, 0))
+                    elif use_head == 3:
+                        print("")
+                        print(f"use_gead: 3 => {gtbox}")
+                        if vis: draw_xyxy(hxyxy_e, img, (0, 225, 225))
+                txt += body_txt
+                txt += head_txt
+
+            if save:
+                with open(make_path, "w") as s:
+                    s.write(txt)
+
+            if vis and use_head != 1:
+                cv2.imshow("img", img)
+                cv2.waitKey(0)
+
+
+def xywh2xyxy(xywh):
+    xyxy = [int(xywh[0]),
+            int(xywh[1]),
+            int(xywh[0] + xywh[2]),
+            int(xywh[1] + xywh[3])]
+    return xyxy
+
+
+def draw_xyxy(xyxy, img, color=None, thickness=2):
+    color = np.random.choice(range(256), size=3).tolist() if color is None else color
+    cv2.rectangle(img, (xyxy[0], xyxy[1]), (xyxy[2], xyxy[3]), color=color, thickness=thickness)
+
+
+def draw_xywh(cpwh, img, color=None, thickness=2):
+    xyxy = xywh2xyxy(cpwh)
+    draw_xyxy(xyxy, img, color, thickness)
+
+
+def get_xyxy_e(box, w, h):
+    xyxy = xywh2xyxy(box)
+    xyxy_e = [max(0, xyxy[0]),
+              max(0, xyxy[1]),
+              min(w, xyxy[2]),
+              min(h, xyxy[3])]
+    return xyxy_e
+
+
+def check_xyxy(xyxy):
+    w = xyxy[2] - xyxy[0]
+    h = xyxy[3] - xyxy[1]
+    if w > 0 and h > 0:
+        return True
+    else:
+        return False
+
+def xyxy2cpwhn(xyxy, w, h):
+    cpwhn = [round(((xyxy[0] + xyxy[2]) / 2 / w), 6),
+             round(((xyxy[1] + xyxy[3]) / 2 / h), 6),
+             round(((xyxy[2] - xyxy[0]) / w), 6),
+             round(((xyxy[3] - xyxy[1]) / h), 6)]
+    return cpwhn
+
+if __name__ == "__main__":
+    root = "/media/daton/D6A88B27A88B0569/dataset/crowdhuman"
+    train_img_path = os.path.join(root, "images", "train")
+    valid_img_path = os.path.join(root, "images", "valid")
+    label_dir_name = "labels_new"
+
+    train_annot_path = os.path.join(root, "annotation_train.odgt")
+    train_make_root = os.path.join(root, label_dir_name, "train")
+    if not os.path.isdir(train_make_root):
+        os.makedirs(train_make_root)
+
+    valid_annot_path = os.path.join(root, "annotation_val.odgt")
+    valid_make_root = os.path.join(root, label_dir_name, "valid")
+    if not os.path.isdir(valid_make_root):
+        os.makedirs(valid_make_root)
+
+    make_labels(train_annot_path, train_img_path, train_make_root, vis=False, save=True)
+    make_labels(valid_annot_path, valid_img_path, valid_make_root, vis=False, save=True)
