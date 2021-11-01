@@ -37,7 +37,7 @@ from hrnet.custom_lib.hrnet_utils.inference_utils import draw_pose, box_to_cente
 from stdet import StdetPredictor
 from mmcv import Config as get_stdet_cfg
 import mmcv
-from custom_dataset.ava_action_label import get_action_dict
+from custom_dataset_utils.ava_action_label import get_action_dict
 
 from efficientnet.model import EfficientClassifier
 
@@ -158,7 +158,7 @@ def run(opt):
 
     # Load Classifier
     clf_model = torch.load(clf_model_pt)
-    clf_model = EfficientClassifier(num_classes=2).cuda().eval()
+    clf_model = EfficientClassifier(model_version="efficientnet-b1", num_classes=2).cuda().eval()
     clf_model.load_state_dict(torch.load(clf_model_pt))
     clf_pp = transforms.Compose([
         #transforms.Resize(128),
@@ -169,7 +169,7 @@ def run(opt):
     # DataLoader
     webcam = source.isnumeric() or source.endswith(".txt") or source.lower().startswith(
         ("rtsp://", "rtmp://", "http://", "https://")
-    )
+    ) or source.startswith("/dev/video")
     if webcam:
         dataset = LoadStreams(source, img_size=yolo_imgsz, stride=stride, auto=True)
         bs = len(dataset)
@@ -306,17 +306,12 @@ def run(opt):
                             if not model_usage[2]:
                                 id = int(output[4]) if show_vid[1] else int(output[-1])
                             else:
-                                if clf_val >= clf_thr:
-                                    id = clf_idx
-                                else:
-                                    id = int(output[4]) if show_vid[1] else int(output[-1])
-
-                            if label == "person":
-                                id = 0
-                            elif label == "civil":
-                                id = 1
-                            elif label == "military":
-                                id = 2
+                                if label == "person":
+                                    id = 0
+                                elif label == "civil":
+                                    id = 1
+                                elif label == "military":
+                                    id = 2
                             annotator.box_label(xyxy, label, color=colors(id, True))
 
                         if model_usage[4] and cls == 0:
@@ -381,7 +376,7 @@ def run(opt):
                             w = int(vid_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
                             h = int(vid_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
                         else:
-                            fps, w, h = 30, im0.shape[1], im0.shape[0]
+                            fps, w, h = 15, im0.shape[1], im0.shape[0]
                             save_path += ".mp4"
                         vid_writer[i] = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*"mp4v"), fps, (w, h))
                     vid_writer[i].write(im0)
@@ -390,13 +385,14 @@ def run(opt):
 def parse_opt():
     parser = argparse.ArgumentParser()
 
-    yolo_weights = "weights/yolov5/yolov5l_crowdhuman_v3.pt"
+    yolo_weights = "weights/yolov5/yolov5l_crowdhuman_v2.pt"
+    #yolo_weights = "yolov5x.pt"
     parser.add_argument("--yolo_weights", nargs="+", type=str, default=yolo_weights)
     parser.add_argument("--yolo-imgsz", "--yolo-img", "--iyolo-mg-size", type=int, default=[640])
-    parser.add_argument("--yolo-conf_thr", "--yolo-conf_thres", type=float, default=0.55)
-    parser.add_argument("--yolo-iou-thr", "--yolo-iou-thres", type=float, default=0.5)
+    parser.add_argument("--yolo-conf_thr", "--yolo-conf_thres", type=float, default=0.6)
+    parser.add_argument("--yolo-iou-thr", "--yolo-iou-thres", type=float, default=0.45)
     parser.add_argument("--yolo-max-det", type=int, default=1000)
-    parser.add_argument("--yolo-target-clss", default=None, nargs="+", type=int)
+    parser.add_argument("--yolo-target-clss", default=0, nargs="+", type=int)
     parser.add_argument("--yolo-save-crop", default=False, action="store_true")
 
     parser.add_argument("--deepsort-cfg", type=str, default="deep_sort_pytorch/configs/deep_sort.yaml")
@@ -419,29 +415,30 @@ def parse_opt():
     parser.add_argument("--stdet-label-map-path", default="../mmaction2/tools/data/ava/label_map.txt")
     parser.add_argument("--stdet-cfg-options", default={})
 
-    clf_model_pt = "weights/classifier/military_civil_clf12.pt"
+    clf_model_pt = "weights/classifier/military_civil_clf_b.pt"
     parser.add_argument("--clf-model_pt", type=str, default=clf_model_pt)
-    parser.add_argument("--clf-imgsz", type=int, default=[128])
+    parser.add_argument("--clf-imgsz", type=int, default=[224])
     parser.add_argument("--clf-label-map-path", default="weights/classifier/military_civil_label_map.txt")
     parser.add_argument("--clf-thr", type=float, default=0.6)
 
     source = "rtsp://datonai:datonai@172.30.1.49:554/stream1"
-    #source = "https://www.youtube.com/watch?v=koGGT2xByoQ"
-    source = "https://www.youtube.com/watch?v=LU8oUZakSKQ"
-    source = "https://www.youtube.com/watch?v=AIWJL43RmSM"
-    source = "https://www.youtube.com/watch?v=NFg8j5HSZ6c"
+
+    source = "https://www.youtube.com/watch?v=8KH10WSgj_I"
+    source = "https://youtu.be/BxPZWJOT9ps"
+    #source = "https://youtu.be/qgVWfaXLvig"
     #source = "/media/daton/D6A88B27A88B0569/dataset/mot/MOT17/train/MOT17-02-DPM/img1"
-    #source = "0"
+
+    source = "/dev/video100"
     parser.add_argument("--source", type=str, default=source)
     parser.add_argument("--device", default="")
     parser.add_argument("--dir_path", default="runs/inference")
     parser.add_argument("--run_name", default="exp")
     parser.add_argument("--is_video_frames", type=bool, default=True)
     parser.add_argument("--save-vid", type=bool, default=True)
-    show_vid = [1, 0, 1, 1, 1]  # idx 0=yolo, 1=deepsort, 2=classifier, 3=hrnet, 4=stdet
+    show_vid = [1, 1, 1, 1, 1]  # idx 0=yolo, 1=deepsort, 2=classifier, 3=hrnet, 4=stdet
     parser.add_argument("--show-vid", type=list, default=show_vid)
     parser.add_argument("--face_mosaic", type=bool, default=True)
-    model_usage = [1, 0, 1, 0, 0]  # idx 0=yolo, 1=deepsort, 2=classifier, 3=hrnet, 4=stdet
+    model_usage = [1, 0, 1, 0, 1]  # idx 0=yolo, 1=deepsort, 2=classifier, 3=hrnet, 4=stdet
     parser.add_argument("--model-usage", type=list, default=model_usage)
     parser.add_argument("--show_cls", type=int, default=0)
 

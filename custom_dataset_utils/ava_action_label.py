@@ -2,8 +2,8 @@
 def get_action_dict(action_list_path):
     with open(action_list_path) as f:
         data = f.read().replace("\n", "")
-
         data_split = data.split("}")
+
         action_dict = {"PERSON_MOVEMENT": [],
                        "OBJECT_MANIPULATION": [],
                        "PERSON_INTERACTION": []}
@@ -17,6 +17,7 @@ def get_action_dict(action_list_path):
                 continue
             tmp_dict = eval(ds)
             action_dict[tmp_dict["label_type"]].append(tmp_dict["name"])
+    return action_dict
 
 
 if __name__ == "__main__":

@@ -1,8 +1,8 @@
 import wget
 import os
 
-trainval_videos_file = "ava_trainval_videos"
-test_videos_file = "ava_test_videos"
+trainval_videos_file = "../ava_trainval_videos"
+test_videos_file = "../ava_test_videos"
 
 def get_videos(file):
     with open(file) as f:

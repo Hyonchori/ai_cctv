@@ -39,7 +39,7 @@ def main(opt):
     ])
     train_dataloader = get_mc_train_dataloader(img_size=opt.img_size,
                                                batch_size=opt.batch_size,
-                                               transform=None)
+                                               transform=train_transform)
     valid_dataloader = get_mc_valid_dataloader(img_size=opt.img_size,
                                                batch_size=opt.batch_size,
                                                transform=None)
@@ -161,13 +161,13 @@ def evaluate(model, epoch, dataloader, loss_fn, device):
 def parse_opt(known=False):
     parser = argparse.ArgumentParser()
     parser.add_argument("--weights", type=str,
-                        default="../weights/classifier/military_civil_clf.pt")
+                        default="../weights/classifier/military_civil_clf_b.pt")
     parser.add_argument("--start_epoch", type=int, default=0)
-    parser.add_argument("--end_epoch", type=int, default=30)
-    parser.add_argument("--batch_size", type=int, default=64)
-    parser.add_argument("--img_size", type=int, default=128)
+    parser.add_argument("--end_epoch", type=int, default=15)
+    parser.add_argument("--batch_size", type=int, default=32)
+    parser.add_argument("--img_size", type=int, default=224)
     parser.add_argument("--save_dir", type=str, default="../weights/classifier")
-    parser.add_argument("--name", type=str, default="military_civil_clf14")
+    parser.add_argument("--name", type=str, default="military_civil_clf_b")
     parser.add_argument("--save_interval", type=int, default=10)
     opt = parser.parse_known_args()[0] if known else parser.parse_args()
     return opt

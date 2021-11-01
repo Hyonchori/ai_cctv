@@ -13,6 +13,10 @@ app.prepare(ctx_id=0, det_size=(640, 480))
 def make_labels(annot_root, img_root, make_root, vis=False, save=False):
     with open(annot_root) as f:
         data = f.readlines()
+        num_body = 0
+        num_head = 0
+        num_bodyu = 0
+        num_headu = 0
         for d in tqdm(data):
             d_dict = eval(d)
             make_path = os.path.join(make_root, d_dict["ID"] + ".txt")
@@ -30,11 +34,13 @@ def make_labels(annot_root, img_root, make_root, vis=False, save=False):
                     if "ignore" in gtbox["head_attr"].keys():
                         if gtbox["head_attr"]["ignore"] == 1:
                             use_head = 2
+                            num_headu += 1
                             continue
 
                 if "ignore" in gtbox["extra"].keys():
                     if gtbox["extra"]["ignore"] == 1:
                         use_head = 3
+                        num_bodyu += 1
                         continue
 
                 fbox = gtbox["fbox"]  # full body including occlusion
@@ -49,17 +55,19 @@ def make_labels(annot_root, img_root, make_root, vis=False, save=False):
                     draw_xyxy(fxyxy_e, img, (225, 0, 0))
                     body_cpwh = xyxy2cpwhn(fxyxy_e, w, h)
                     body_txt = f"0 {body_cpwh[0]} {body_cpwh[1]} {body_cpwh[2]} {body_cpwh[3]}\n"
+                    num_body += 1
 
                 head_txt = ""
                 if check_xyxy(hxyxy_e):
-                    head_cpwh = xyxy2cpwhn(hxyxy_e, w, h)
+                    num_head += 1
+                    '''head_cpwh = xyxy2cpwhn(hxyxy_e, w, h)
                     head_img = imgc[hxyxy_e[1]: hxyxy_e[3], hxyxy_e[0]: hxyxy_e[2]]
                     face = app.get(head_img)
                     if len(face) >= 1:
                         head_idx = 2
                     else:
                         head_idx = 1
-                    head_txt = f"{head_idx} {head_cpwh[0]} {head_cpwh[1]} {head_cpwh[2]} {head_cpwh[3]}\n"
+                    head_txt = f"{head_idx} {head_cpwh[0]} {head_cpwh[1]} {head_cpwh[2]} {head_cpwh[3]}\n"'''
                     if use_head == 1:
                         if vis: draw_xyxy(hxyxy_e, img, (0, 0, 225))
                     elif use_head == 2:
@@ -80,6 +88,11 @@ def make_labels(annot_root, img_root, make_root, vis=False, save=False):
             if vis and use_head != 1:
                 cv2.imshow("img", img)
                 cv2.waitKey(0)
+        print("")
+        print(f"num body: {num_body}")
+        print(f"num head: {num_head}")
+        print(f"num body unused: {num_bodyu}")
+        print(f"num head unused: {num_headu}")
 
 
 def xywh2xyxy(xywh):
@@ -140,5 +153,5 @@ if __name__ == "__main__":
     if not os.path.isdir(valid_make_root):
         os.makedirs(valid_make_root)
 
-    make_labels(train_annot_path, train_img_path, train_make_root, vis=False, save=True)
-    make_labels(valid_annot_path, valid_img_path, valid_make_root, vis=False, save=True)
+    make_labels(train_annot_path, train_img_path, train_make_root, vis=False, save=False)
+    make_labels(valid_annot_path, valid_img_path, valid_make_root, vis=False, save=False)
