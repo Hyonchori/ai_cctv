@@ -153,5 +153,5 @@ if __name__ == "__main__":
     if not os.path.isdir(valid_make_root):
         os.makedirs(valid_make_root)
 
-    make_labels(train_annot_path, train_img_path, train_make_root, vis=False, save=False)
-    make_labels(valid_annot_path, valid_img_path, valid_make_root, vis=False, save=False)
+    #make_labels(train_annot_path, train_img_path, train_make_root, vis=False, save=False)
+    make_labels(valid_annot_path, valid_img_path, valid_make_root, vis=True, save=False)
