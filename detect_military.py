@@ -42,6 +42,25 @@ from custom_dataset_utils.ava_action_label import get_action_dict
 from efficientnet.model import EfficientClassifier
 
 
+def draw_bbox(img, bbox, label, color, font_scale=1, fonst_thick=1, bg=False):
+    tmp_img = np.zeros(img.shape, np.uint8)
+    tl = (int(bbox[0]), int(bbox[1]))
+    br = (int(bbox[2]), int(bbox[3]))
+    line_color = (max(color[0] - 30, 0), max(color[1] - 30, 0), max(color[2] - 30, 0))
+    if bg:
+        cv2.rectangle(tmp_img, tl, br, color, -1)
+    cv2.rectangle(tmp_img, tl, br, line_color, 2)
+    t_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_PLAIN, font_scale, fonst_thick)[0]
+    cv2.rectangle(
+        tmp_img, (tl[0] - 1, tl[1] - 2),
+        (int(bbox[0]) + t_size[0] + 2, int(bbox[1]) + t_size[1] + 3), line_color, -1
+    )
+    cv2.putText(tmp_img, label, (tl[0], tl[1] + 9),
+                cv2.FONT_HERSHEY_PLAIN, font_scale, [255, 255, 255], fonst_thick, lineType=cv2.LINE_AA)
+    tmp_result = cv2.addWeighted(img, 0.7, tmp_img, 0.4, 0)
+    cv2.copyTo(tmp_result, tmp_img, img)
+
+
 def plot_action_label(img, actions, st, colors, verbose):
     location = (0 + st[0], 18 + verbose * 18 + st[1])
     diag0 = (location[0] + 20, location[1] - 14)
@@ -81,12 +100,10 @@ def run(opt):
     yolo_iou_thr = opt.yolo_iou_thr
     yolo_max_det = opt.yolo_max_det
     yolo_target_clss = opt.yolo_target_clss
-    yolo_save_crop = opt.yolo_save_crop
 
     # Load configs of DeepSORT
     deepsort_cfg = get_deepsort_cfg()
     deepsort_cfg.merge_from_file(opt.deepsort_cfg)
-    deepsort_weights = opt.deepsort_weights
 
     # Load configs of STDet
     stdet_cfg = get_stdet_cfg.fromfile(opt.stdet_cfg)
@@ -104,6 +121,7 @@ def run(opt):
     clf_label_map_path = opt.clf_label_map_path
     clf_label_map = [x.replace("\n", "") for x in open(clf_label_map_path).readlines()]
     clf_thr = opt.clf_thr
+    clf_hide_conf = opt.clf_hide_conf
 
     # Load other configs for inference
     source = opt.source
@@ -119,7 +137,8 @@ def run(opt):
 
     # Directories result will be saved
     save_dir = increment_path(Path(dir_path) / run_name, exist_ok=False)
-    save_dir.mkdir(parents=True, exist_ok=True)
+    if save_vid:
+        save_dir.mkdir(parents=True, exist_ok=True)
 
     # Initialize
     set_logging()
@@ -132,22 +151,6 @@ def run(opt):
     yolo_imgsz = check_img_size(yolo_imgsz, s=stride)
     ascii = is_ascii(names)
 
-    if model_usage[3]:
-        # Load configs of HRNet
-        update_config(hrnet_cfg, opt)
-        hrnet_vis_thr = opt.hrnet_vis_thr
-
-        # Load HRNet model
-        hrnet_model = eval(f"hrnet_models.{hrnet_cfg.MODEL.NAME}.get_pose_net")(hrnet_cfg, is_train=False)
-        if hrnet_cfg.TEST.MODEL_FILE:
-            print('=> loading model from {}'.format(hrnet_cfg.TEST.MODEL_FILE))
-            hrnet_model.load_state_dict(torch.load(hrnet_cfg.TEST.MODEL_FILE), strict=False)
-        else:
-            print('expected model defined in config at TEST.MODEL_FILE')
-        hrnet_model = torch.nn.DataParallel(hrnet_model, device_ids=hrnet_cfg.GPUS)
-        hrnet_model.to(device).eval()
-        hrnet_imgsz = hrnet_cfg.MODEL.IMAGE_SIZE
-
     # Load STDet model
     stdet_model = StdetPredictor(
         config=stdet_cfg,
@@ -158,14 +161,8 @@ def run(opt):
     )
 
     # Load Classifier
-    clf_model = torch.load(clf_model_pt)
     clf_model = EfficientClassifier(model_version="efficientnet-b1", num_classes=2).cuda().eval()
     clf_model.load_state_dict(torch.load(clf_model_pt))
-    clf_pp = transforms.Compose([
-        #transforms.Resize(128),
-        #transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
-    ])
 
     # DataLoader
     webcam = source.isnumeric() or source.endswith(".txt") or source.lower().startswith(
@@ -198,7 +195,6 @@ def run(opt):
     }
     if device.type != "cpu":
         yolo_model(torch.zeros(1, 3, *yolo_imgsz).to(device).type_as(next(yolo_model.parameters())))
-        #hrnet_model(torch.zeros(1, 3, *hrnet_imgsz).to(device).type_as(next(hrnet_model.parameters())))
         clf_model(torch.zeros(1, 3, *clf_imgsz).to(device).type_as(next(clf_model.parameters())))
         stdet_model.model(**action_input)
 
@@ -299,23 +295,24 @@ def run(opt):
                             clf_val = torch.max(clf_pred, dim=1)[0]
                             if clf_idx == 0:
                                 if clf_val >= clf_thr + 0.3 and show_vid[2]:
-                                    label = f"{clf_label_map[clf_idx]} {clf_val.item():.2f}"
-                                    #label = f"{clf_label_map[clf_idx]}"
+                                    label = f"{clf_label_map[clf_idx]} {clf_val.item():.2f}" if clf_hide_conf \
+                                        else f"{clf_label_map[clf_idx]}"
                             elif clf_idx == 1:
-                                if clf_val >= clf_thr and show_vid[2]:
-                                    label = f"{clf_label_map[clf_idx]} {clf_val.item():.2f}"
-                                    #label = f"{clf_label_map[clf_idx]}"
+                                if clf_val >= clf_thr + 0.2 and show_vid[2]:
+                                    label = f"{clf_label_map[clf_idx]} {clf_val.item():.2f}" if clf_hide_conf \
+                                        else f"{clf_label_map[clf_idx]}"
                         if box_show and cls == show_cls:
                             if not model_usage[2]:
                                 id = int(output[4]) if show_vid[1] else int(output[-1])
                             else:
-                                if "person" in label:
+                                if "person" in label or "civil" in label:
                                     id = 0
-                                elif "civil" in label:
-                                    id = 1
+                                    label = "person"
+                                    draw_bbox(im0, xyxy, label, (50, 225, 225))
                                 elif "military" in label:
                                     id = 2
-                            annotator.box_label(xyxy, label, color=colors(id, True))
+                                    draw_bbox(im0, xyxy, label, colors(id, True), bg=True)
+                            #annotator.box_label(xyxy, label, color=colors(id, True))
 
                         if model_usage[4] and cls == 0:
                             if isinstance(xyxy, np.ndarray):
@@ -361,16 +358,6 @@ def run(opt):
                     deepsort_model_list[i].increment_ages()
 
             t2 = time_sync()
-            if isinstance(vid_cap, list):
-                pass
-                #print(vid_cap[i].get(cv2.CAP_PROP_FRAME_COUNT))
-                #print(vid_cap[i].get(cv2.CAP_PROP_POS_FRAMES))
-            elif vid_cap is not None:
-                pass
-                #print(vid_cap.get(cv2.CAP_PROP_FRAME_COUNT))
-                #print(vid_cap.get(cv2.CAP_PROP_POS_FRAMES))
-            else:
-                pass
             print(f"elapsed time: {t2 - t1:.4f}")
             if any(show_vid):
                 cv2.imshow("img", im0)
@@ -390,7 +377,7 @@ def run(opt):
                             w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
                             h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
                         else:
-                            fps, w, h = 25, im0.shape[1], im0.shape[0]
+                            fps, w, h = 30, im0.shape[1], im0.shape[0]
                         save_path += ".mp4"
                         vid_writer[i] = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*"mp4v"), fps, (w, h))
                     vid_writer[i].write(im0)
@@ -400,25 +387,16 @@ def parse_opt():
     parser = argparse.ArgumentParser()
 
     yolo_weights = "weights/yolov5/yolov5l_crowdhuman_v4.pt"
-    #yolo_weights = "yolov5x.pt"
     parser.add_argument("--yolo_weights", nargs="+", type=str, default=yolo_weights)
     parser.add_argument("--yolo-imgsz", "--yolo-img", "--iyolo-mg-size", type=int, default=[640])
     parser.add_argument("--yolo-conf_thr", "--yolo-conf_thres", type=float, default=0.5)
     parser.add_argument("--yolo-iou-thr", "--yolo-iou-thres", type=float, default=0.6)
     parser.add_argument("--yolo-max-det", type=int, default=1000)
-    parser.add_argument("--yolo-target-clss", default=0, nargs="+", type=int)
+    parser.add_argument("--yolo-target-clss", default=None, nargs="+", type=int)
     parser.add_argument("--yolo-save-crop", default=False, action="store_true")
 
     parser.add_argument("--deepsort-cfg", type=str, default="deep_sort_pytorch/configs/deep_sort.yaml")
     parser.add_argument("--deepsort-weights", type=str, default="weights/deep_sort/deep/checkpoint/ckpt.t7")
-
-    hrnet_cfg = "weights/hrnet/hrnet-config.yaml"
-    parser.add_argument("--hrnet-cfg", type=str, default=hrnet_cfg)
-    parser.add_argument("--hrnet-opts", default=[])
-    parser.add_argument("--hrnet-modelDir", default="")
-    parser.add_argument("--hrnet-logDir", default="")
-    parser.add_argument("--hrnet-dataDir", default="")
-    parser.add_argument("--hrnet-vis-thr", type=float, default=0.6)
 
     stdet_cfg = "mmaction2/configs/detection/ava/slowfast_kinetics_pretrained_r50_8x8x1_cosine_10e_ava22_rgb.py"
     stdet_weights = "weights/stdet/slowfast_kinetics_pretrained_r50_8x8x1_cosine_10e_ava22_rgb-b987b516.pth"
@@ -430,39 +408,28 @@ def parse_opt():
     parser.add_argument("--stdet-cfg-options", default={})
 
     clf_model_pt = "weights/classifier/military_civil_clf_b.pt"
-    #clf_model_pt = "/home/daton/PycharmProjects/pythonProject/sam/example/weights/effb1-96.pt"
     parser.add_argument("--clf-model_pt", type=str, default=clf_model_pt)
     parser.add_argument("--clf-imgsz", type=int, default=[128])
     parser.add_argument("--clf-label-map-path", default="weights/classifier/military_civil_label_map.txt")
     parser.add_argument("--clf-thr", type=float, default=0.6)
+    parser.add_argument("--clf-hide-conf", type=bool, default=False)
 
     source = "rtsp://datonai:datonai@172.30.1.49:554/stream1"
-    #source = "https://www.youtube.com/watch?v=aQfObI_FAAw"
-    #source = "https://www.youtube.com/watch?v=668J-hyfJ0E"
-    #source = "https://www.youtube.com/watch?v=8KH10WSgj_I"
-    #source = "https://youtu.be/BxPZWJOT9ps"
-    #source = "https://youtu.be/qgVWfaXLvig"
-    #source = "/media/daton/D6A88B27A88B0569/dataset/mot/MOT17/train/MOT17-02-DPM/img1"
-    #source = "/media/daton/D6A88B27A88B0569/dataset/video2frames/exp"
-
-    #source = "/dev/video100"
     #source = "0"
-    #source = "/home/daton/Downloads/videos/sample.mp4"
-    #source = "/home/daton/Downloads/videos/bandicam 2021-09-24 05-22-34-452.mp4"
-    #source = "/home/daton/Downloads/thermal/ltir_v1_0_8bit_16bit/8_quadrocopter"
-
+    #source = "https://youtu.be/BxPZWJOT9ps"
     parser.add_argument("--source", type=str, default=source)
     parser.add_argument("--device", default="")
-    parser.add_argument("--dir_path", default="runs/inference")
+    parser.add_argument("--dir_path", default="runs/detect_military")
     parser.add_argument("--run_name", default="exp")
     parser.add_argument("--is_video_frames", type=bool, default=True)
-    parser.add_argument("--save-vid", type=bool, default=False)
+    parser.add_argument("--save-vid", type=bool, default=True)
     show_vid = [1, 1, 1, 1, 1]  # idx 0=yolo, 1=deepsort, 2=classifier, 3=hrnet, 4=stdet
     parser.add_argument("--show-vid", type=list, default=show_vid)
     parser.add_argument("--face_mosaic", type=bool, default=True)
     model_usage = [1, 0, 1, 0, 0]  # idx 0=yolo, 1=deepsort, 2=classifier, 3=hrnet, 4=stdet
     parser.add_argument("--model-usage", type=list, default=model_usage)
     parser.add_argument("--show_cls", type=int, default=0)
+    parser.add_argument("--show-label", type=str, default=None)
 
     opt = parser.parse_args()
     opt.yolo_imgsz *= 2 if len(opt.yolo_imgsz) == 1 else 1  # expand
@@ -472,7 +439,6 @@ def parse_opt():
 
 def main(opt):
     print(colorstr('Inference: ') + ', '.join(f'{k}={v}' for k, v in vars(opt).items()))
-    check_requirements(requirements="yolov5/requirements.txt", exclude=("tensorboard", "thop"))
     run(opt)
 
 

@@ -16,6 +16,7 @@ from dllib.data.for_train.military_civil_dataset import get_mc_train_dataloader,
 from dllib.train.losses import FocalLoss
 from dllib.train.lr_schedulers import CosineAnnealingWarmUpRestarts
 from ai_cctv.efficientnet.model import EfficientClassifier
+from sam.sam import SAM
 
 
 def main(opt):
