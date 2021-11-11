@@ -407,7 +407,7 @@ def parse_opt():
     parser.add_argument("--stdet-label-map-path", default="../mmaction2/tools/data/ava/label_map.txt")
     parser.add_argument("--stdet-cfg-options", default={})
 
-    clf_model_pt = "weights/classifier/military_civil_clf_b.pt"
+    clf_model_pt = "weights/classifier/military_civil_clf_f2.pt"
     parser.add_argument("--clf-model_pt", type=str, default=clf_model_pt)
     parser.add_argument("--clf-imgsz", type=int, default=[128])
     parser.add_argument("--clf-label-map-path", default="weights/classifier/military_civil_label_map.txt")
@@ -416,7 +416,9 @@ def parse_opt():
 
     source = "rtsp://datonai:datonai@172.30.1.49:554/stream1"
     #source = "0"
-    #source = "https://youtu.be/BxPZWJOT9ps"
+    source = "https://youtu.be/BxPZWJOT9ps"
+    source = "https://youtu.be/8KH10WSgj_I"
+
     parser.add_argument("--source", type=str, default=source)
     parser.add_argument("--device", default="")
     parser.add_argument("--dir_path", default="runs/detect_military")

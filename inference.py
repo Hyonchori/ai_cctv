@@ -426,10 +426,10 @@ def parse_opt():
     parser.add_argument("--stdet-weights", default=stdet_weights)
     parser.add_argument("--stdet-action-score-thr", type=float, default=0.4)
     parser.add_argument("--stdet-action-list-path", default="weights/stdet/ava_action_list_v2.2.pbtxt")
-    parser.add_argument("--stdet-label-map-path", default="../mmaction2/tools/data/ava/label_map.txt")
+    parser.add_argument("--stdet-label-map-path", default="mmaction2/tools/data/ava/label_map.txt")
     parser.add_argument("--stdet-cfg-options", default={})
 
-    clf_model_pt = "weights/classifier/military_civil_clf_b.pt"
+    clf_model_pt = "weights/classifier/military_civil_clf_f.pt"
     #clf_model_pt = "/home/daton/PycharmProjects/pythonProject/sam/example/weights/effb1-96.pt"
     parser.add_argument("--clf-model_pt", type=str, default=clf_model_pt)
     parser.add_argument("--clf-imgsz", type=int, default=[128])
@@ -437,6 +437,7 @@ def parse_opt():
     parser.add_argument("--clf-thr", type=float, default=0.6)
 
     source = "rtsp://datonai:datonai@172.30.1.49:554/stream1"
+    source = "https://www.youtube.com/watch?v=HZlx7yrDu3c"
     #source = "https://www.youtube.com/watch?v=aQfObI_FAAw"
     #source = "https://www.youtube.com/watch?v=668J-hyfJ0E"
     #source = "https://www.youtube.com/watch?v=8KH10WSgj_I"
@@ -460,7 +461,7 @@ def parse_opt():
     show_vid = [1, 1, 1, 1, 1]  # idx 0=yolo, 1=deepsort, 2=classifier, 3=hrnet, 4=stdet
     parser.add_argument("--show-vid", type=list, default=show_vid)
     parser.add_argument("--face_mosaic", type=bool, default=True)
-    model_usage = [1, 0, 1, 0, 0]  # idx 0=yolo, 1=deepsort, 2=classifier, 3=hrnet, 4=stdet
+    model_usage = [1, 0, 0, 0, 1]  # idx 0=yolo, 1=deepsort, 2=classifier, 3=hrnet, 4=stdet
     parser.add_argument("--model-usage", type=list, default=model_usage)
     parser.add_argument("--show_cls", type=int, default=0)
 
