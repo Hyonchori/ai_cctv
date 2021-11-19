@@ -402,11 +402,11 @@ def parse_opt():
     yolo_weights = "weights/yolov5/yolov5l_crowdhuman_v4.pt"
     #yolo_weights = "yolov5x.pt"
     parser.add_argument("--yolo_weights", nargs="+", type=str, default=yolo_weights)
-    parser.add_argument("--yolo-imgsz", "--yolo-img", "--iyolo-mg-size", type=int, default=[640])
+    parser.add_argument("--yolo-imgsz", "--yolo-img", "--yolo-img-size", type=int, default=[640])
     parser.add_argument("--yolo-conf_thr", "--yolo-conf_thres", type=float, default=0.5)
     parser.add_argument("--yolo-iou-thr", "--yolo-iou-thres", type=float, default=0.6)
     parser.add_argument("--yolo-max-det", type=int, default=1000)
-    parser.add_argument("--yolo-target-clss", default=0, nargs="+", type=int)
+    parser.add_argument("--yolo-target-clss", default=[0, 1], nargs="+", type=int)
     parser.add_argument("--yolo-save-crop", default=False, action="store_true")
 
     parser.add_argument("--deepsort-cfg", type=str, default="deep_sort_pytorch/configs/deep_sort.yaml")
@@ -437,7 +437,7 @@ def parse_opt():
     parser.add_argument("--clf-thr", type=float, default=0.6)
 
     source = "rtsp://datonai:datonai@172.30.1.49:554/stream1"
-    source = "https://www.youtube.com/watch?v=HZlx7yrDu3c"
+    #source = "https://www.youtube.com/watch?v=HZlx7yrDu3c"
     #source = "https://www.youtube.com/watch?v=aQfObI_FAAw"
     #source = "https://www.youtube.com/watch?v=668J-hyfJ0E"
     #source = "https://www.youtube.com/watch?v=8KH10WSgj_I"

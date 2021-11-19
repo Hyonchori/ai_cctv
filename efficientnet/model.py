@@ -10,6 +10,7 @@ class EfficientClassifier(nn.Module):
         self.model = EfficientNet.from_pretrained(model_version, num_classes=num_classes)
         self.out_act = nn.Softmax(dim=1)
 
+
     def forward(self, x, epoch=None):
         return self.out_act(self.model(x))
 

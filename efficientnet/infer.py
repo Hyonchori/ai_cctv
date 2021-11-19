@@ -16,7 +16,7 @@ from ai_cctv.efficientnet.model import EfficientClassifier
 
 
 def main(opt):
-    model = EfficientClassifier().cuda().eval()
+    model = EfficientClassifier(num_classes=10).cuda().eval()
     if opt.weights is not None:
         if os.path.isfile(opt.weights):
             wts = torch.load(opt.weights)
@@ -61,6 +61,10 @@ def evaluate(model, epoch, dataloader, loss_fn, device):
         img_cls = torch.from_numpy(img_cls).to(device).float()
 
         pred = model(img_b.float(), epoch)
+        for p, cls, name in zip(pred, img_cls, img_name):
+            print("")
+            print(p, cls, name)
+
         loss = loss_fn(pred, img_cls)
 
         gt_cls = torch.argmax(img_cls, dim=1)
@@ -78,7 +82,7 @@ def evaluate(model, epoch, dataloader, loss_fn, device):
 def parse_opt(known=False):
     parser = argparse.ArgumentParser()
     parser.add_argument("--weights", type=str,
-                        default="../weights/classifier/military_civil_clf11.pt")
+                        default="../weights/classifier/mnist3.pt")
     parser.add_argument("--batch_size", type=int, default=64)
     parser.add_argument("--img_size", type=int, default=128)
     opt = parser.parse_known_args()[0] if known else parser.parse_args()

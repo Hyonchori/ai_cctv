@@ -4,6 +4,8 @@ import argparse
 import copy
 import time
 import csv
+from pathlib import Path
+import sys
 
 import torch
 import torch.nn as nn
@@ -11,16 +13,17 @@ import torch.optim as optim
 import albumentations as A
 from tqdm import tqdm
 
+FILE = Path(__file__).absolute()
+sys.path.append(FILE.parents[2].as_posix())
 from dllib.data.for_train.military_civil_dataset import get_mc_train_dataloader, \
     get_mc_valid_dataloader
 from dllib.train.losses import FocalLoss
 from dllib.train.lr_schedulers import CosineAnnealingWarmUpRestarts
 from ai_cctv.efficientnet.model import EfficientClassifier
-from sam.sam import SAM
 
 
 def main(opt):
-    model = EfficientClassifier(model_version="efficientnet-b1").cuda()
+    model = EfficientClassifier(model_version="efficientnet-b1", num_classes=10).cuda()
     if opt.weights is not None:
         if os.path.isfile(opt.weights):
             wts = torch.load(opt.weights)
@@ -31,12 +34,12 @@ def main(opt):
     device = next(model.parameters()).device
 
     train_transform = A.Compose([
-        A.RandomBrightnessContrast(),
-        #A.HorizontalFlip(),
+        #A.RandomBrightnessContrast(),
+        A.HorizontalFlip(),
         A.Rotate(limit=20),
-        A.RandomContrast(),
-        A.RandomGamma(),
-        A.Cutout(num_holes=4, max_w_size=12, max_h_size=12)
+        #A.RandomContrast(),
+        #A.RandomGamma(),
+        A.Cutout(num_holes=4, max_w_size=24, max_h_size=24)
     ])
     train_dataloader = get_mc_train_dataloader(img_size=opt.img_size,
                                                batch_size=opt.batch_size,
@@ -47,10 +50,11 @@ def main(opt):
 
     #loss_fn = nn.MSELoss()
     #loss_fn = nn.BCELoss()
-    loss_fn = FocalLoss(nn.BCELoss(weight=torch.tensor([1., 1.3]).to(device)))
-    optimizer = optim.SGD(model.parameters(), lr=0.001, weight_decay=0.003, momentum=0.9)
+    loss_fn = FocalLoss(nn.BCELoss())
+    optimizer = optim.SGD(model.parameters(), lr=0.01, weight_decay=0.0005, momentum=0.93)
     #optimizer = optim.Adam(model.parameters(), lr=0.0001, weight_decay=0.003)
     #lr_sch = CosineAnnealingWarmUpRestarts(optimizer, T_0=10, T_mult=2, eta_max=0.0001, T_up=3, gamma=0.95)
+    lr_sch = torch.optim.lr_scheduler.MultiStepLR(optimizer, [200, 500, 700], 0.9)
 
     save_dir = opt.save_dir
     if not os.path.isdir(save_dir):
@@ -96,7 +100,7 @@ def main(opt):
             best_acc = valid_loss[1]
             best_model_wts = copy.deepcopy(model.state_dict())
 
-        #lr_sch.step()
+        lr_sch.step()
         if e % save_interval == 0:
             torch.save(best_model_wts, wts_save_dir)
 
@@ -162,13 +166,13 @@ def evaluate(model, epoch, dataloader, loss_fn, device):
 def parse_opt(known=False):
     parser = argparse.ArgumentParser()
     parser.add_argument("--weights", type=str,
-                        default="../weights/classifier/military_civil_clf_f.pt")
+                        default="../weights/classifier/mnist.pt")
     parser.add_argument("--start_epoch", type=int, default=0)
-    parser.add_argument("--end_epoch", type=int, default=15)
-    parser.add_argument("--batch_size", type=int, default=32)
-    parser.add_argument("--img_size", type=int, default=128)
+    parser.add_argument("--end_epoch", type=int, default=1000)
+    parser.add_argument("--batch_size", type=int, default=64)
+    parser.add_argument("--img_size", type=int, default=196)
     parser.add_argument("--save_dir", type=str, default="../weights/classifier")
-    parser.add_argument("--name", type=str, default="military_civil_clf_f2")
+    parser.add_argument("--name", type=str, default="mnist5")
     parser.add_argument("--save_interval", type=int, default=10)
     opt = parser.parse_known_args()[0] if known else parser.parse_args()
     return opt
