@@ -54,7 +54,6 @@ def make_labels(annot_root, img_root, make_root, vis=False, save=False, iou_thr=
 
                 iou = compare_iou(fxyxy_e, hxyxy_e)
                 if iou >= iou_thr:
-                    print(iou)
                     use_head = 4
                     too_big_head = True
 

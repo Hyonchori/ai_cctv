@@ -25,5 +25,5 @@ def check_duplicate(label_dir, edit=False):
 
 
 if __name__ == "__main__":
-    label_dir = "/media/daton/D6A88B27A88B0569/dataset/crowdhuman/labels/train"
+    label_dir = "/media/daton/D6A88B27A88B0569/dataset/crowdhuman/valid/labels"
     check_duplicate(label_dir, True)
