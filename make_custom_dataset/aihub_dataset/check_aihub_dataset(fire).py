@@ -2,6 +2,7 @@ import os
 import json
 
 import cv2
+import numpy as np
 from tqdm import tqdm
 
 
@@ -27,9 +28,13 @@ colors = Colors()
 labels = ["black smoke", "gray smoke", "white smoke", "fire", "cloud", "fog", "light", "sun light", "swing1", "swing2", "nomatter"]
 
 
-def show_target_idx(root, target, idx, resize=(1280, 720)):
-    img_dir = os.path.join(root, f"[원천]{target}_{idx}")
-    label_dir = os.path.join(root, f"[라벨]{target}")
+def show_target_idx(root, target, idx, resize=(1280, 720), train=True):
+    if train:
+        img_dir = os.path.join(root, f"[원천]{target}_{idx}")
+        label_dir = os.path.join(root, f"[라벨]{target}")
+    else:
+        img_dir = os.path.join(root, f"[원천]{target}{idx}")
+        label_dir = os.path.join(root, f"[라벨]1.{target}")
     imgs = [x for x in sorted(os.listdir(img_dir)) if x.endswith(".jpg")]
     for img_name in imgs:
         img_path = os.path.join(img_dir, img_name)
@@ -43,8 +48,17 @@ def show_target_idx(root, target, idx, resize=(1280, 720)):
             cls = int(l["class"])
             color = colors(cls, True)
             if "box" not in l:
-                continue
-            xyxy = l["box"]
+                if "polygon" in l:
+                    poly = np.array(l["polygon"])
+                    x_min = min(poly[:, 0])
+                    y_min = min(poly[:, 1])
+                    x_max = max(poly[:, 0])
+                    y_max = max(poly[:, 1])
+                    xyxy = [x_min, y_min, x_max, y_max]
+                else:
+                    continue
+            else:
+                xyxy = l["box"]
             font = cv2.FONT_HERSHEY_SIMPLEX
             cv2.putText(img, f"{cls - 1}: {labels[cls - 1]}", (xyxy[0], xyxy[1] - 5), font, 1, color, 2)
             cv2.rectangle(img, (xyxy[0], xyxy[1]), (xyxy[2], xyxy[3]), color, 2)
@@ -81,16 +95,40 @@ def make_yolov5_dataset_sep(root, target, idx, save_dir, save=False, train=True)
         w, h = img_info["resolution"]
         tmp_annots = annot["annotations"]
         txt = ""
+        exclude = False
         for l in tmp_annots:
             cls = int(l["class"]) - 1
-            if "box" not in l:
+            if cls in [0, 1, 2]:
+                cls = 0
+            elif cls == 3:
+                cls = 1
+            elif cls in [4, 5]:
+                cls = 2
+            elif cls in [6, 7]:
+                cls = 3
+            else:
                 continue
-            xyxy = l["box"]
+            if "box" not in l:
+                if "polygon" in l:
+                    try:
+                        poly = np.array(l["polygon"])
+                        x_min = min(poly[:, 0])
+                        y_min = min(poly[:, 1])
+                        x_max = max(poly[:, 0])
+                        y_max = max(poly[:, 1])
+                        xyxy = [x_min, y_min, x_max, y_max]
+                    except IndexError:
+                        exclude = True
+                        break
+                else:
+                    continue
+            else:
+                xyxy = l["box"]
             cpwhn = xyxy2cpwhn(xyxy, w, h)
             txt += f"{cls} {cpwhn[0]} {cpwhn[1]} {cpwhn[2]} {cpwhn[3]}\n"
         tmp_save_image_path = os.path.join(save_image_path, img_name)
         tmp_save_label_path = os.path.join(save_label_path, img_name.replace(".jpg", ".txt"))
-        if save:
+        if save and not exclude:
             cv2.imwrite(tmp_save_image_path, img)
             with open(tmp_save_label_path, "w") as f:
                 f.write(txt)
@@ -115,12 +153,12 @@ def make_yolov5_dataset(root, target, save_dir, save=False, train=True):
 
 
 if __name__ == "__main__":
-    root = "/media/daton/D6A88B27A88B0569/dataset/화재 발생 예측 영상/Validation"
+    root = "/media/daton/D6A88B27A88B0569/dataset/화재_발생_예측_영상/Training"
     target = "화재씬"
     idx = 2
 
-    #show_target_idx(root, target, idx)
+    #show_target_idx(root, target, idx, train=False)
 
     save_dir = root
     #make_yolov5_dataset_sep(root, target, idx, save_dir, save=True)
-    make_yolov5_dataset(root, target, save_dir, save=True, train=False)
+    make_yolov5_dataset(root, target, save_dir, save=True, train=True)

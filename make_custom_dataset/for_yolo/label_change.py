@@ -1,8 +1,8 @@
 import os
 from tqdm import tqdm
 
-target_dir = "/home/daton/Downloads/person head detection.v1i.yolov5pytorch/valid/labels"
-out_dir = "/home/daton/Downloads/person head detection.v1i.yolov5pytorch/valid/labels_edit"
+target_dir = "/home/daton/Downloads/fire detector.v1i.yolov5pytorch/train/labels"
+out_dir = "/home/daton/Downloads/fire detector.v1i.yolov5pytorch/train/labels_edit"
 
 files = sorted(os.listdir(target_dir))
 for file in tqdm(files):
@@ -12,12 +12,14 @@ for file in tqdm(files):
 
         edit_data = []
         for d in data:
-            if d[0] == "2":
+            if d[0] == "3":
                 line = "0" + d[1:]
-            elif d[0] == "1":
+            elif d[0] == "2":
                 line = d
             elif d[0] == "0":
-                line = "2" + d[1:]
+                line = "1" + d[1:]
+            elif d[0] == 1:
+                line = "3" + d[1:]
             edit_data.append(line)
 
         str = ""
