@@ -49,7 +49,7 @@ def plot_action_label(img, actions, st, colors, verbose):
     cv2.rectangle(img, diag0, diag1, colors(verbose + 110, True), -1)
     if len(actions) > 0:
         for (label, score) in actions:
-            text = f"{label}: {score:.2f}"
+            text = f"{label}"
             textsize = cv2.getTextSize(text, cv2.FONT_HERSHEY_DUPLEX, 0.5, 1)[0]
             textwidth = textsize[0]
             diag0 = (location[0] + textwidth, location[1] - 14)
@@ -92,6 +92,7 @@ def run(opt):
     stdet_cfg = get_stdet_cfg.fromfile(opt.stdet_cfg)
     stdet_cfg.merge_from_dict(opt.stdet_cfg_options)
     stdet_weights = opt.stdet_weights
+    stdet_interval = opt.stdet_interval
     stdet_action_score_thr = opt.stdet_action_score_thr
     stdet_label_map_path = opt.stdet_label_map_path
     stdet_img_norm_cfg = stdet_cfg["img_norm_cfg"]
@@ -124,6 +125,7 @@ def run(opt):
     # Initialize
     set_logging()
     device = select_device(device)
+    device = torch.device("cpu")
 
     # Load YOLOv5 model
     yolo_model = attempt_load(yolo_weights, map_location=device)
@@ -203,6 +205,7 @@ def run(opt):
         stdet_model.model(**action_input)
 
     stdet_input_imgs = [collections.deque([], maxlen=8) for _ in range(bs)]
+    tmp_interval = 0
     for path, img, im0s, vid_cap in dataset:
         print("\n---")
         img = torch.from_numpy(img).to(device)
@@ -265,7 +268,7 @@ def run(opt):
 
                 if len(box_iter) > 0:
                     tmp_proposals = []
-                    if model_usage[4]:
+                    if model_usage[4] and tmp_interval % stdet_interval == 0:
                         stdet_input_size = mmcv.rescale_size((im0.shape[1], im0.shape[0]), (256, np.inf))
                         if "to_rgb" not in stdet_img_norm_cfg and "to_bgr" in stdet_img_norm_cfg:
                             to_bgr = stdet_img_norm_cfg.pop("to_bgr")
@@ -277,6 +280,8 @@ def run(opt):
                         _ = mmcv.imnormalize_(stdet_input_img, **stdet_img_norm_cfg)
                         stdet_input_imgs[i].append(stdet_input_img)
                         ratio = (stdet_input_size[0] / im0.shape[1], stdet_input_size[1] / im0.shape[0])
+                        tmp_interval = 0
+                    tmp_interval += 1
 
                     for output in box_iter:
                         xyxy = output[: 4]
@@ -390,7 +395,7 @@ def run(opt):
                             w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
                             h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
                         else:
-                            fps, w, h = 25, im0.shape[1], im0.shape[0]
+                            fps, w, h = 20, im0.shape[1], im0.shape[0]
                         save_path += ".mp4"
                         vid_writer[i] = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*"mp4v"), fps, (w, h))
                     vid_writer[i].write(im0)
@@ -420,10 +425,11 @@ def parse_opt():
     parser.add_argument("--hrnet-dataDir", default="")
     parser.add_argument("--hrnet-vis-thr", type=float, default=0.6)
 
-    stdet_cfg = "mmaction2/configs/detection/ava/slowfast_kinetics_pretrained_r50_8x8x1_cosine_10e_ava22_rgb.py"
-    stdet_weights = "weights/stdet/slowfast_kinetics_pretrained_r50_8x8x1_cosine_10e_ava22_rgb-b987b516.pth"
+    stdet_cfg = "mmaction2/configs/detection/ava/slowfast_kinetics_pretrained_r50_4x16x1_20e_ava_rgb_custom_classes.py"
+    stdet_weights = "weights/stdet/slowfast_kinetics_pretrained_r50_4x16x1_20e_ava_rgb_custom_classes_20210305-c6225546.pth"
     parser.add_argument("--stdet-cfg", default=stdet_cfg)
     parser.add_argument("--stdet-weights", default=stdet_weights)
+    parser.add_argument("--stdet-interval", type=int, default=1)
     parser.add_argument("--stdet-action-score-thr", type=float, default=0.4)
     parser.add_argument("--stdet-action-list-path", default="weights/stdet/ava_action_list_v2.2.pbtxt")
     parser.add_argument("--stdet-label-map-path", default="mmaction2/tools/data/ava/label_map.txt")
@@ -437,30 +443,19 @@ def parse_opt():
     parser.add_argument("--clf-thr", type=float, default=0.6)
 
     source = "rtsp://datonai:datonai@172.30.1.49:554/stream1"
-    #source = "https://www.youtube.com/watch?v=HZlx7yrDu3c"
-    #source = "https://www.youtube.com/watch?v=aQfObI_FAAw"
-    #source = "https://www.youtube.com/watch?v=668J-hyfJ0E"
-    #source = "https://www.youtube.com/watch?v=8KH10WSgj_I"
-    #source = "https://youtu.be/BxPZWJOT9ps"
-    #source = "https://youtu.be/qgVWfaXLvig"
-    #source = "/media/daton/D6A88B27A88B0569/dataset/mot/MOT17/train/MOT17-02-DPM/img1"
-    #source = "/media/daton/D6A88B27A88B0569/dataset/video2frames/exp"
-
-    #source = "/dev/video100"
-    #source = "0"
-    #source = "/home/daton/Downloads/videos/sample.mp4"
-    #source = "/home/daton/Downloads/videos/bandicam 2021-09-24 05-22-34-452.mp4"
-    #source = "/home/daton/Downloads/thermal/ltir_v1_0_8bit_16bit/8_quadrocopter"
+    source = "/media/daton/D6A88B27A88B0569/dataset/mot/MOT17/train/MOT17-04-DPM/img1"
+    source = "0"
+    source = "/media/daton/SAMSUNG1/지하철 역사 내 CCTV 이상행동 영상/Training/에스컬레이터 전도/에스컬레이터 전도_2/3118061"
 
     parser.add_argument("--source", type=str, default=source)
     parser.add_argument("--device", default="")
     parser.add_argument("--dir_path", default="runs/inference")
     parser.add_argument("--run_name", default="exp")
     parser.add_argument("--is_video_frames", type=bool, default=True)
-    parser.add_argument("--save-vid", type=bool, default=False)
+    parser.add_argument("--save-vid", type=bool, default=True)
     show_vid = [1, 1, 1, 1, 1]  # idx 0=yolo, 1=deepsort, 2=classifier, 3=hrnet, 4=stdet
     parser.add_argument("--show-vid", type=list, default=show_vid)
-    parser.add_argument("--face_mosaic", type=bool, default=True)
+    parser.add_argument("--face_mosaic", type=bool, default=False)
     model_usage = [1, 0, 0, 0, 1]  # idx 0=yolo, 1=deepsort, 2=classifier, 3=hrnet, 4=stdet
     parser.add_argument("--model-usage", type=list, default=model_usage)
     parser.add_argument("--show_cls", type=int, default=0)
