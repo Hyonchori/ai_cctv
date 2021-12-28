@@ -60,5 +60,5 @@ if __name__ == "__main__":
     #output_root = "/media/daton/SAMSUNG/dataset/ava/rawframes"
     output_root = "/media/daton/Data/dataset/ava/rawframes"
 
-    extract_rgb_frames_onevid(input_root, vid_name, output_root, save=True, vis=False)
-    #extract_rgb_frames(input_root, output_root, save=True, vis=False)
+    #extract_rgb_frames_onevid(input_root, vid_name, output_root, save=True, vis=False)
+    extract_rgb_frames(input_root, output_root, save=True, vis=False)
