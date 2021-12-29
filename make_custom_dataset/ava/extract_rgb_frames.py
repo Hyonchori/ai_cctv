@@ -54,7 +54,7 @@ def extract_rgb_frames(input_root, output_root, save=True, vis=False):
         break
 
 if __name__ == "__main__":
-    input_root = "/media/daton/SAMSUNG/dataset/ava/videos_15min"
+    input_root = "/media/daton/Data/dataset/ava/videos_15min"
     vid_name = "-5KQ66BBWC4.mkv"
     vid_name = '-FaXLcSFjUI.mp4'
     #output_root = "/media/daton/SAMSUNG/dataset/ava/rawframes"

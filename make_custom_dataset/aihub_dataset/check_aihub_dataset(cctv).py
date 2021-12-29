@@ -12,6 +12,7 @@ def show_target_idx_num(root, target, idx, num, view=True, rm_short=True, resize
     label_dir = os.path.join(root, target, f"[라벨]{target}_{idx}")
     img_dir = os.path.join(img_root_dir, str(num))
     annot_file = os.path.join(label_dir, f"annotation_{num}.json")
+    vid_path = ""
     with open(annot_file) as f:
         annot = json.load(f)
     if len(annot["frames"]) >= 150:
@@ -24,6 +25,7 @@ def show_target_idx_num(root, target, idx, num, view=True, rm_short=True, resize
                     box = l["label"]
                     name = l["category"]["code"]
                     xyxy = box2xyxy(box)
+                    #cv2.putText(img, name, (xyxy[0], xyxy[1]), 0, 2, (0, 255, 0), 2)
                     cv2.rectangle(img, (xyxy[0], xyxy[1]), (xyxy[2], xyxy[3]), (0, 255, 0), 2)
                 img = cv2.resize(img, dsize=resize)
                 cv2.imshow(f"{num} - {len(annot['frames'])}", img)
@@ -59,14 +61,15 @@ def show_target_idx_nums(root, target, idx):
     print(f"\n--- Processing {img_root_dir}")
     time.sleep(0.5)
     for num in tqdm(nums):
-        show_target_idx_num(root, target, idx, num, view=False, rm_short=True)
+        show_target_idx_num(root, target, idx, num, view=True, rm_short=False)
 
 
 if __name__ == "__main__":
-    root = "/media/daton/SAMSUNG1/지하철 역사 내 CCTV 이상행동 영상/Training"
-    target = "에스컬레이터 전도"
-    idx = 4
+    root = "/media/daton/SAMSUNG/지하철 역사 내 CCTV 이상행동 영상/Training"
+    target = "개집표기 무단진입"
+    idx = 7
 
-    #num = 3117598
+
+    num = 2112680
     #show_target_idx_num(root, target, idx, num)
     show_target_idx_nums(root, target, idx)
