@@ -55,6 +55,7 @@ def extract_rgb_frames(input_root, output_root, save=True, vis=False):
 
 if __name__ == "__main__":
     input_root = "/media/daton/Data/dataset/ava/videos_15min"
+    input_root = "/media/daton/Data/dataset/ava/target_videos_15min"
     vid_name = "-5KQ66BBWC4.mkv"
     vid_name = '-FaXLcSFjUI.mp4'
     #output_root = "/media/daton/SAMSUNG/dataset/ava/rawframes"
@@ -62,3 +63,7 @@ if __name__ == "__main__":
 
     #extract_rgb_frames_onevid(input_root, vid_name, output_root, save=True, vis=False)
     extract_rgb_frames(input_root, output_root, save=True, vis=False)
+
+    '''
+    cp -r ./-5KQ66BBWC4 /media/daton/SAMSUNG/dataset/ava/rawframes/
+    '''
