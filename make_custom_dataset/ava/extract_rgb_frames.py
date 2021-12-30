@@ -51,7 +51,7 @@ def extract_rgb_frames(input_root, output_root, ref_root, save=True, vis=False):
                  and x.split(".")[0] not in aleady_names]
     print(aleady_names)
     print(vid_names)
-    interval = 60
+    interval = 80
     for i, vid_name in enumerate(vid_names):
         print(f"\n############# {i + 1}  / {len(vid_names)}")
         extract_rgb_frames_onevid(input_root, vid_name, output_root, save, vis)
