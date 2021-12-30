@@ -10,12 +10,12 @@ if __name__ == "__main__":
         print(len(target_videos))
 
     target_root = "/media/daton/Data/dataset/ava/rawframes"
-    candi_videos = os.listdir(target_root)
+    candi_videos = [x for x in os.listdir(target_root) if x in target_videos]
     cnt = 0
-    for candi in candi_videos:
-        if candi in target_videos:
-            print(f"\n--- {candi}")
-            tmp_path = os.path.join(target_root, candi)
-            shutil.make_archive(tmp_path, "zip", tmp_path)
-            shutil.rmtree(tmp_path)
+    for i, candi in enumerate(candi_videos):
+        print(f"\n--- {candi}   {i + 1} / {len(candi_videos)}")
+        tmp_path = os.path.join(target_root, candi)
+        shutil.make_archive(tmp_path, "zip", tmp_path)
+        shutil.rmtree(tmp_path)
+        cnt += 1
     print(cnt)
